@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+*.log
+
+# Internal launch docs — not for public landing repo
+RUNBOOK.md
+demo-script.md
+launch-post.md
+mcp-catalog-submission.md
+New1Direction-profile-README.md
