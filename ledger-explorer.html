@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Korg Ledger Explorer — tamper it yourself</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#090a0c; --panel:#13161b; --panel2:#181c22; --line:#262b33;
+    --text:#e9e7e0; --dim:#9aa0ab; --faint:#646b76;
+    --lime:#b8ff3c; --amber:#ffb24a; --red:#ff5d5d; --cyan:#62e8ff;
+    --mono:'JetBrains Mono',ui-monospace,monospace; --disp:'Syne',sans-serif; --body:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--text);font-family:var(--body);font-size:17px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(820px 480px at 85% -10%,rgba(184,255,60,.07),transparent 60%),
+      radial-gradient(680px 520px at -8% 8%,rgba(98,232,255,.05),transparent 55%);}
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.32;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px;position:relative;z-index:2}
+  .mono{font-family:var(--mono)} a{color:var(--lime);text-decoration:none}
+
+  header{padding:72px 0 26px}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--faint);display:flex;gap:12px;flex-wrap:wrap}
+  .kicker b{color:var(--lime);font-weight:500}
+  h1{font-family:var(--disp);font-weight:800;font-size:clamp(34px,6vw,62px);line-height:1;letter-spacing:-.02em;margin:18px 0 0;color:#fff}
+  .lede{font-size:19px;max-width:680px;margin:20px 0 0;color:#cfd3da}
+  .lede em{color:var(--lime);font-style:normal}
+
+  /* verdict banner */
+  .verdict{margin:30px 0 8px;padding:20px 24px;border-radius:8px;border:1px solid var(--line);
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;transition:.25s;background:var(--panel)}
+  .verdict.ok{border-color:rgba(184,255,60,.5);box-shadow:0 0 0 1px rgba(184,255,60,.08),0 20px 50px -34px rgba(184,255,60,.5)}
+  .verdict.bad{border-color:rgba(255,93,93,.55);box-shadow:0 0 0 1px rgba(255,93,93,.08)}
+  .verdict .big{font-family:var(--disp);font-weight:800;font-size:22px}
+  .verdict.ok .big{color:var(--lime)} .verdict.bad .big{color:var(--red)}
+  .verdict .detail{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
+  .verdict .tip{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:3px}
+  .verdict .tip b{color:var(--cyan)}
+
+  .controls{display:flex;gap:10px;margin:14px 0 6px;flex-wrap:wrap}
+  button{font-family:var(--mono);font-size:12px;background:transparent;border:1px solid var(--line);color:var(--text);
+    padding:9px 15px;border-radius:6px;cursor:pointer;transition:.18s;letter-spacing:.03em}
+  button:hover{border-color:var(--cyan);color:var(--cyan)}
+  button.restore:hover{border-color:var(--lime);color:var(--lime)}
+
+  /* chain */
+  .chain{margin:14px 0 0;display:flex;flex-direction:column;gap:0}
+  .evt{border:1px solid var(--line);border-radius:8px;padding:16px 18px;background:var(--panel);position:relative;transition:.2s}
+  .evt.broken{border-color:rgba(255,93,93,.6);background:rgba(255,93,93,.05)}
+  .evt .row1{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .evt .seq{font-family:var(--mono);font-size:12px;color:var(--lime);font-weight:700}
+  .evt.broken .seq{color:var(--red)}
+  .evt .tool{font-family:var(--disp);font-weight:700;font-size:16px;color:#fff}
+  .evt .by{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .evt .args{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:7px;word-break:break-all}
+  .evt .hashes{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:8px;display:flex;flex-direction:column;gap:2px}
+  .evt .hashes .h{color:var(--cyan)} .evt.broken .hashes .h{color:var(--red)}
+  .evt .flag{font-family:var(--mono);font-size:11px;color:var(--red);margin-top:8px;display:none}
+  .evt.broken .flag{display:block}
+  .evt .tamper{position:absolute;top:14px;right:14px;padding:5px 10px;font-size:10px}
+  .link{display:flex;justify-content:center;height:22px;align-items:center}
+  .link svg{height:22px}
+  .link .l{stroke:var(--lime);stroke-width:1.5}
+  .link.broken .l{stroke:var(--red);stroke-dasharray:3 3}
+
+  footer{padding:48px 0 80px;margin-top:32px;border-top:1px solid var(--line);text-align:center}
+  footer .q{font-family:var(--disp);font-weight:700;font-size:clamp(18px,3vw,24px);color:#fff;max-width:680px;margin:0 auto;letter-spacing:-.01em}
+  footer .q .hi{color:var(--lime)}
+  footer .impls{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:18px}
+  footer .impls b{color:var(--cyan)}
+  footer .meta{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:14px}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="wrap">
+  <header>
+    <div class="kicker"><span>Korg</span> · <span>Ledger Explorer</span> · <b>korg-ledger@v1</b></div>
+    <h1>Don't trust the log.<br>Verify it.</h1>
+    <p class="lede">This is a real korg cognition journal — three hash-linked events. Your browser recomputes the chain from scratch with the <em>same</em> canonicalization the Python, Rust, and thumper implementations use. Click <span class="mono" style="color:var(--amber)">tamper</span> on any event and watch the proof break, live.</p>
+  </header>
+
+  <div class="verdict ok" id="verdict">
+    <div class="big" id="vbig">verifying…</div>
+    <div>
+      <div class="detail" id="vdetail"></div>
+      <div class="tip" id="vtip"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="restore" id="restore">↺ restore original</button>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--faint);align-self:center">edit any field → the chain re-verifies instantly in your browser</span>
+  </div>
+
+  <div class="chain" id="chain"></div>
+
+  <footer>
+    <div class="q">Every other agent's session log is an opaque, editable file.<br><span class="hi">A korg journal proves it was never altered.</span></div>
+    <div class="impls">One spec, <b>four independent implementations</b> that reproduce the same hashes: Python · Rust core · thumper · this page.</div>
+    <div class="meta">korg-ledger@v1 · SHA-256 hash-chain · frozen conformance tip 7418b910…</div>
+  </footer>
+</div>
+
+<script>
+// ── korg-ledger@v1 reference, in the browser (must match Python/Rust byte-for-byte) ──
+function jsonString(s){
+  let out = '"';
+  for (const ch of s){
+    const cp = ch.codePointAt(0);
+    if (ch === '"') out += '\\"';
+    else if (ch === '\\') out += '\\\\';
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\r') out += '\\r';
+    else if (ch === '\t') out += '\\t';
+    else if (cp === 0x08) out += '\\b';
+    else if (cp === 0x0c) out += '\\f';
+    else if (cp >= 0x20 && cp <= 0x7e) out += ch;
+    else if (cp > 0xFFFF){
+      const v = cp - 0x10000;
+      out += '\\u'+(0xD800+(v>>10)).toString(16).padStart(4,'0');
+      out += '\\u'+(0xDC00+(v&0x3FF)).toString(16).padStart(4,'0');
+    } else out += '\\u'+cp.toString(16).padStart(4,'0');
+  }
+  return out + '"';
+}
+function canonical(v){
+  if (v === null) return "null";
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (typeof v === "number") return String(v);
+  if (typeof v === "string") return jsonString(v);
+  if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
+  return "{" + Object.keys(v).sort().map(k => jsonString(k)+":"+canonical(v[k])).join(",") + "}";
+}
+async function chainHash(event){
+  const pre = {}; for (const k of Object.keys(event)) if (k !== "entry_hash") pre[k] = event[k];
+  const bytes = new TextEncoder().encode(canonical(pre));   // canonical() is ASCII-only
+  const buf = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+const GENESIS = "0".repeat(64);
+async function verifyChain(events){
+  const errs = []; let expected = GENESIS;
+  for (const e of events){
+    if (e.prev_hash !== expected) errs.push({seq:e.seq_id, why:"broken link (insert/delete/reorder)"});
+    if (await chainHash(e) !== e.entry_hash) errs.push({seq:e.seq_id, why:"content tampered"});
+    expected = e.entry_hash;
+  }
+  return errs;
+}
+
+// ── the journal (korg-ledger@v1 basic-intact conformance vector) ──
+const ORIGINAL = [
+  {schema_version:"1.0",seq_id:1,source_agent:"agent:conformance",tool_name:"user_prompt",args:{prompt:"add a function"},result:{},success:true,duration_ms:0,prev_hash:"0000000000000000000000000000000000000000000000000000000000000000",entry_hash:"845344fd0d2830343a5494005420c492eacf3bbf244d671dc9dc1e9ec1f23bb4"},
+  {schema_version:"1.0",seq_id:2,source_agent:"agent:conformance",tool_name:"llm_inference",args:{model:"m",prompt_tokens:10},result:{completion_tokens:4},success:true,duration_ms:12,triggered_by:1,prev_hash:"845344fd0d2830343a5494005420c492eacf3bbf244d671dc9dc1e9ec1f23bb4",entry_hash:"675d596a62e4a1c24cbbcc3e0ce80612a875b875df72897a2d21afe910e1088c"},
+  {schema_version:"1.0",seq_id:3,source_agent:"agent:conformance",tool_name:"Write",args:{path:"mathx.py"},result:{ok:true},success:true,duration_ms:3,triggered_by:2,prev_hash:"675d596a62e4a1c24cbbcc3e0ce80612a875b875df72897a2d21afe910e1088c",entry_hash:"7418b9105a664e21078fde881fbd8a5295c49bb384aa62a48d5b544292d910af"}
+];
+const FROZEN_TIP = "7418b9105a664e21078fde881fbd8a5295c49bb384aa62a48d5b544292d910af";
+let events = structuredClone(ORIGINAL);
+
+const chainEl = document.getElementById('chain');
+const short = h => h ? h.slice(0,10)+"…"+h.slice(-6) : "—";
+
+function render(errs){
+  const broken = new Set(errs.map(e => e.seq));
+  chainEl.innerHTML = "";
+  events.forEach((e, i) => {
+    if (i > 0){
+      const linkBad = broken.has(e.seq_id) && errs.some(x => x.seq===e.seq_id && x.why.includes("link"));
+      const link = document.createElement('div');
+      link.className = "link" + (linkBad ? " broken" : "");
+      link.innerHTML = '<svg width="2" height="22"><line class="l" x1="1" y1="0" x2="1" y2="22"/></svg>';
+      chainEl.appendChild(link);
+    }
+    const isBad = broken.has(e.seq_id);
+    const card = document.createElement('div');
+    card.className = "evt" + (isBad ? " broken" : "");
+    const argStr = JSON.stringify(e.args);
+    card.innerHTML = `
+      <button class="tamper" data-seq="${e.seq_id}">✎ tamper</button>
+      <div class="row1">
+        <span class="seq">seq ${e.seq_id}</span>
+        <span class="tool">${e.tool_name}</span>
+        ${e.triggered_by ? `<span class="by">← triggered_by ${e.triggered_by}</span>` : `<span class="by">root</span>`}
+      </div>
+      <div class="args">args = ${argStr}</div>
+      <div class="hashes">
+        <span>prev_hash &nbsp;${short(e.prev_hash)}</span>
+        <span>entry_hash <span class="h">${short(e.entry_hash)}</span></span>
+      </div>
+      <div class="flag">✗ ${(errs.find(x=>x.seq===e.seq_id)||{}).why || ""}</div>`;
+    chainEl.appendChild(card);
+  });
+  chainEl.querySelectorAll('.tamper').forEach(b =>
+    b.addEventListener('click', () => tamper(+b.dataset.seq)));
+}
+
+async function refresh(){
+  const errs = await verifyChain(events);
+  const v = document.getElementById('verdict');
+  const tip = await chainHash(events[events.length-1]);
+  if (errs.length === 0){
+    v.className = "verdict ok";
+    document.getElementById('vbig').textContent = "✓ LEDGER INTACT";
+    document.getElementById('vdetail').textContent = `${events.length} events · hash-chain verified in your browser`;
+    document.getElementById('vtip').innerHTML = `recomputed tip <b>${tip.slice(0,12)}…</b> — matches the frozen conformance hash ${tip===FROZEN_TIP ? "✓ (identical to Python · Rust · thumper)" : ""}`;
+  } else {
+    v.className = "verdict bad";
+    document.getElementById('vbig').textContent = "✗ LEDGER TAMPERED";
+    document.getElementById('vdetail').textContent = errs.map(e => `seq ${e.seq}: ${e.why}`).join("  ·  ");
+    document.getElementById('vtip').innerHTML = `the chain no longer matches — exactly what <b>korgex verify</b> reports (exit 1)`;
+  }
+  render(errs);
+}
+
+function tamper(seq){
+  const e = events.find(x => x.seq_id === seq);
+  // edit a field WITHOUT recomputing entry_hash — just like a real attacker
+  if (e.tool_name === "Write") e.args = {path: "/etc/passwd"};
+  else if (e.args.prompt) e.args = {prompt: e.args.prompt + " (edited)"};
+  else if (e.args.model) e.args = {...e.args, model: "evil-model"};
+  else e.args = {...e.args, _tampered: true};
+  refresh();
+}
+
+document.getElementById('restore').addEventListener('click', () => {
+  events = structuredClone(ORIGINAL);
+  refresh();
+});
+
+refresh();
+</script>
+</body>
+</html>
