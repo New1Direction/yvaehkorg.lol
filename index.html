@@ -22,6 +22,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+<!-- es-module-shims polyfills <script type="importmap"> on browsers that lack
+     native support (Safari < 16.4, older iOS/macOS, many in-app webviews). It
+     no-ops where import maps are native (modern Chrome/Safari 16.4+), so it's
+     safe everywhere. MUST load before the importmap + any module scripts, or the
+     3D hero silently fails on those browsers. -->
+<script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"
+        crossorigin="anonymous"></script>
+
 <!-- Importmap so Three.js's example modules resolve internal 'three' bare specifiers.
      Required for GLTFLoader / DRACOLoader. Must come before any module scripts. -->
 <script type="importmap">
