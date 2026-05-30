@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>korg · watch two agents coordinate, then break the proof</title>
+<meta name="description" content="Two AI agents coordinate on a task over the verifiable korg agent bus. Every message and every read receipt is a hash-chained ledger event — edit one in your browser and watch the proof break. korg-ledger@v1.">
+<style>
+  :root{
+    --bg:#0a0c0f; --panel:#0f1318; --panel-2:#0b0e12; --line:#1d2733; --ink:#c7d2dd; --dim:#6b7a8a;
+    --ok:#37e0a0; --ok-dim:#10543c; --bad:#ff5b5b; --bad-dim:#5a1620;
+    --planner:#7cc5ff; --coder:#37e0a0; --hash:#8a7cff;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.5}
+  body{
+    background-image:radial-gradient(1200px 600px at 82% -12%, #112233 0%, transparent 58%),
+                     radial-gradient(900px 520px at -12% 8%, #1a1326 0%, transparent 55%);
+    padding:0 0 80px;
+  }
+  ::selection{background:rgba(124,197,255,.22)}
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px}
+  a{color:var(--planner);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* header */
+  header{padding:58px 0 26px}
+  .eyebrow{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--dim)}
+  .eyebrow b{color:var(--hash);font-weight:600}
+  h1{font-family:var(--sans);font-weight:800;font-size:clamp(28px,5vw,42px);letter-spacing:-.02em;
+     line-height:1.05;margin:16px 0 0;color:#eef4fa}
+  h1 .b{color:var(--bad)}
+  .lede{color:var(--dim);margin-top:14px;max-width:64ch;font-size:15px}
+  .lede .k{color:var(--ink)}
+
+  /* verdict */
+  .verdict{margin:30px 0 8px;border:1px solid var(--line);border-radius:14px;padding:20px 22px;
+           background:linear-gradient(180deg,var(--panel),var(--panel-2));position:relative;overflow:hidden;
+           transition:border-color .25s}
+  .verdict::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--dim);transition:background .25s}
+  .verdict.ok::before{background:var(--ok)} .verdict.bad::before{background:var(--bad)}
+  .verdict.ok{border-color:rgba(55,224,160,.28)} .verdict.bad{border-color:rgba(255,91,91,.34)}
+  .verdict .tag{font-family:var(--sans);font-weight:800;font-size:21px;letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+  .verdict.ok .tag{color:var(--ok)} .verdict.bad .tag{color:var(--bad)}
+  .verdict .why{color:var(--dim);margin-top:7px;max-width:66ch}
+  .verdict .why b{color:var(--ink);font-weight:600}
+  .dot{width:11px;height:11px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,224,160,.4)}70%{box-shadow:0 0 0 12px rgba(55,224,160,0)}100%{box-shadow:0 0 0 0 rgba(55,224,160,0)}}
+  .verdict.bad .dot{animation:none}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 4px;align-items:center}
+  button{font-family:var(--mono);font-size:13px;cursor:pointer;border-radius:9px;padding:9px 14px;
+         border:1px solid var(--line);background:#121821;color:var(--ink);transition:.15s}
+  button:hover{border-color:#2f4256;background:#161f2a}
+  button.primary{border-color:rgba(255,91,91,.4);background:rgba(255,91,91,.08);color:#ffb3b3}
+  button.primary:hover{background:rgba(255,91,91,.16)}
+  button.ghost{background:transparent}
+  .hint{color:var(--dim);font-size:12px}
+
+  /* conversation */
+  h2{font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+     margin:40px 0 16px;font-weight:700}
+  .legend{display:flex;gap:18px;margin:-6px 0 18px;font-size:12px;color:var(--dim)}
+  .legend i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
+  .legend .pip{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .convo{display:flex;flex-direction:column;gap:18px}
+  .turn{display:flex;flex-direction:column;max-width:78%}
+  .turn.planner{align-self:flex-start;align-items:flex-start}
+  .turn.coder{align-self:flex-end;align-items:flex-end}
+  .who{font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:0 4px 6px;color:var(--dim)}
+  .turn.planner .who{color:var(--planner)}
+  .turn.coder .who{color:var(--coder)}
+  .bubble{position:relative;border:1px solid var(--line);border-radius:14px;padding:13px 15px;
+          background:var(--panel);font-size:14.5px;color:#e7eef6;line-height:1.55;outline:none;transition:.18s;
+          min-width:46px}
+  .turn.planner .bubble{border-top-left-radius:4px}
+  .turn.coder .bubble{border-top-right-radius:4px;background:#0d1512}
+  .bubble[contenteditable="true"]{cursor:text;border-style:dashed;border-color:#37506b}
+  .bubble[contenteditable="true"]:focus{border-color:var(--planner);background:#101722}
+  .turn.coder .bubble[contenteditable="true"]:focus{border-color:var(--coder)}
+  .bubble.tampered{border-color:var(--bad)!important;background:rgba(255,91,91,.07)!important;
+                   box-shadow:0 0 0 1px rgba(255,91,91,.3)}
+  .meta{display:flex;align-items:center;gap:9px;margin:7px 4px 0;font-size:11px;color:var(--dim);flex-wrap:wrap}
+  .meta .seq{color:var(--dim)}
+  .meta .hsh{color:var(--hash);font-variant-numeric:tabular-nums}
+  .meta .tick{color:var(--ok)}
+  .meta .tampflag{color:var(--bad);font-weight:600}
+  .turn.coder .meta{justify-content:flex-end}
+
+  /* chain spine */
+  .chainwrap{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,var(--panel),var(--panel-2));padding:18px;margin-top:8px}
+  #chain{display:flex;flex-direction:column;gap:0}
+  .blk{display:flex;align-items:center;gap:12px;background:#0e141b;border:1px solid var(--line);
+       border-radius:10px;padding:10px 13px;transition:.18s}
+  .blk .seq{color:var(--dim);min-width:30px;text-align:right;font-variant-numeric:tabular-nums}
+  .blk .tool{color:#cfe0ee;min-width:128px;font-size:12.5px}
+  .blk .h{color:var(--hash);font-size:12px;margin-left:auto}
+  .blk.broken{border-color:var(--bad);background:rgba(255,91,91,.08)}
+  .blk.broken .h{color:var(--bad)}
+  .link{width:2px;height:13px;background:var(--ok-dim);margin:2px 0 2px 44px}
+  .link.broken{background:var(--bad)}
+
+  .note{color:var(--dim);font-size:12.5px;margin:14px 2px 0;max-width:70ch}
+  .note code{color:var(--hash);background:#11161d;padding:1px 5px;border-radius:5px;font-size:12px}
+
+  /* how it works */
+  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);
+       border-radius:12px;overflow:hidden;margin-top:18px}
+  .how .step{background:var(--panel);padding:16px 16px 18px}
+  .how .n{color:var(--hash);font-size:12px;letter-spacing:.1em}
+  .how .t{color:#eef4fa;font-family:var(--sans);font-weight:600;margin:7px 0 5px;font-size:14px}
+  .how .d{color:var(--dim);font-size:12.5px;line-height:1.5}
+  @media(max-width:680px){.how{grid-template-columns:1fr}.turn{max-width:90%}}
+
+  footer{margin-top:46px;padding-top:22px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px;
+         display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+  footer .grow{flex:1}
+  .codeline{margin-top:10px;font-size:12.5px;color:var(--dim)}
+  .codeline code{color:var(--ok);background:#0d1411;padding:2px 7px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><b>korg-ledger@v1</b> &nbsp;·&nbsp; verifiable agent bus</div>
+    <h1>Two agents coordinated.<br>Now try to <span class="b">forge</span> what they said.</h1>
+    <p class="lede">Below is a real, hands-free exchange between two AI agents over the korg bus — a task handed
+      off, built, revised, confirmed. Every message <span class="k">and every read receipt</span> is a
+      hash-chained ledger event. This page recomputes the whole SHA-256 chain
+      <span class="k">in your browser</span> — not on a server, not by the tool that wrote it.
+      Edit any message and watch the proof break.</p>
+  </header>
+
+  <div class="verdict ok" id="verdict">
+    <div class="tag"><span class="dot"></span><span id="vtag">verifying…</span></div>
+    <div class="why" id="vwhy">Recomputing the hash chain locally…</div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="btnForge">✎ Forge the first message</button>
+    <button class="ghost" id="btnEdit">Make every message editable</button>
+    <button id="btnReset" style="display:none">↺ Restore the original</button>
+    <span class="hint" id="editHint"></span>
+  </div>
+
+  <h2>The conversation</h2>
+  <div class="legend">
+    <i><span class="pip" style="background:var(--planner)"></span> planner</i>
+    <i><span class="pip" style="background:var(--coder)"></span> coder</i>
+    <i><span class="tick">✓✓</span> read receipt (its own chained event)</i>
+  </div>
+  <div class="convo" id="convo"></div>
+
+  <h2>The hash chain underneath</h2>
+  <div class="chainwrap">
+    <div id="chain"></div>
+  </div>
+  <p class="note">Each block commits to the one before it by hash. Change a single character in any message and
+    that block's <code>entry_hash</code> no longer matches its contents — the recomputed chain rejects it, and
+    it lights up red above and below. There is nowhere to hide an edit.</p>
+
+  <h2>Why this matters</h2>
+  <div class="how">
+    <div class="step"><div class="n">01</div><div class="t">Agents coordinate</div>
+      <div class="d">Two korgex agents pass work over the bus with <code>BusSend</code> / <code>BusInbox</code> — no human relaying messages. Pending mail is auto-delivered into the next task.</div></div>
+    <div class="step"><div class="n">02</div><div class="t">Every word is recorded</div>
+      <div class="d">Each message and read receipt is appended to one tamper-evident, hash-chained ledger. Secrets in bodies are redacted before they're written.</div></div>
+    <div class="step"><div class="n">03</div><div class="t">Anyone can verify</div>
+      <div class="d">The recipient — or an auditor, or you, right now — recomputes the chain offline and proves what was said, in what order, unaltered.</div></div>
+  </div>
+
+  <div class="codeline">Run it yourself: &nbsp;<code>korgex bus send coder "ship it" &amp;&amp; korgex bus history --html</code></div>
+
+  <footer>
+    <span class="grow">korg-ledger@v1 — verifiable cognition for AI agents.</span>
+    <a href="/">korg home</a>
+    <a href="/audit-demo.html">session audit demo →</a>
+    <a href="https://pypi.org/project/korgex/">pip install korgex</a>
+  </footer>
+</div>
+
+<!-- ── korg-ledger@v1 reference verifier (embedded verbatim from src/assets/korg_verify.js) ── -->
+<script>
+function jsonString(s) {
+  let out = '"';
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (ch === '"') out += '\\"';
+    else if (ch === '\\') out += '\\\\';
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\r') out += '\\r';
+    else if (ch === '\t') out += '\\t';
+    else if (cp === 0x08) out += '\\b';
+    else if (cp === 0x0c) out += '\\f';
+    else if (cp >= 0x20 && cp <= 0x7e) out += ch;
+    else if (cp > 0xffff) {
+      const v = cp - 0x10000;
+      out += '\\u' + (0xd800 + (v >> 10)).toString(16).padStart(4, '0');
+      out += '\\u' + (0xdc00 + (v & 0x3ff)).toString(16).padStart(4, '0');
+    } else out += '\\u' + cp.toString(16).padStart(4, '0');
+  }
+  return out + '"';
+}
+function canonical(v) {
+  if (v === null) return 'null';
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') return jsonString(v);
+  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  return '{' + Object.keys(v).sort().map((k) => jsonString(k) + ':' + canonical(v[k])).join(',') + '}';
+}
+const GENESIS = '0'.repeat(64);
+async function chainHash(event) {
+  const pre = {};
+  for (const k of Object.keys(event)) if (k !== 'entry_hash') pre[k] = event[k];
+  const bytes = new TextEncoder().encode(canonical(pre));
+  const buf = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function verifyChain(events) {
+  const errs = [];
+  let expected = GENESIS;
+  for (const e of events) {
+    if (e.prev_hash !== expected) errs.push({ seq: e.seq_id, why: 'broken link (insert/delete/reorder)' });
+    if ((await chainHash(e)) !== e.entry_hash) errs.push({ seq: e.seq_id, why: 'content tampered' });
+    expected = e.entry_hash;
+  }
+  return errs;
+}
+</script>
+
+<!-- ── the real coordination journal (deterministic, generated by `korg.bus`) ── -->
+<script id="ledger" type="application/json">
+[{"schema_version":"1.0","seq_id":1,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"planner","to":"coder","team":null,"body":"Build a retry helper: wrap a call, retry on failure with exponential backoff."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"0000000000000000000000000000000000000000000000000000000000000000","entry_hash":"daffbbda0e044d4e72b035a5eea7659fd28144e5fb4aa97c6be0f238dc93930f"},{"schema_version":"1.0","seq_id":2,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"coder","message_seq":1},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"daffbbda0e044d4e72b035a5eea7659fd28144e5fb4aa97c6be0f238dc93930f","entry_hash":"144c9c92cdf34354d88e2d2f9de1d04e8bc6e920d9bf47b218ab8333cfdccab8"},{"schema_version":"1.0","seq_id":3,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"coder","to":"planner","team":null,"body":"Done — retry_with_backoff() opened in PR #41, 3 tests passing."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":1,"prev_hash":"144c9c92cdf34354d88e2d2f9de1d04e8bc6e920d9bf47b218ab8333cfdccab8","entry_hash":"7465747b3c44d060bdfd59436ebd988fd869524059d474903414a9d5f8fe6a8d"},{"schema_version":"1.0","seq_id":4,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"planner","message_seq":3},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"7465747b3c44d060bdfd59436ebd988fd869524059d474903414a9d5f8fe6a8d","entry_hash":"6035596f358bcc92eeb7aa2ac792aed8301e53a870930c16b570ea69c1844897"},{"schema_version":"1.0","seq_id":5,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"planner","to":"coder","team":null,"body":"Cap it at 5 attempts so we don't hammer a dead endpoint."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":3,"prev_hash":"6035596f358bcc92eeb7aa2ac792aed8301e53a870930c16b570ea69c1844897","entry_hash":"7f395cf827bb2aa2ef2f34a1de3b26581258fdef48ba7e7f6e3afbb23c2188df"},{"schema_version":"1.0","seq_id":6,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"coder","message_seq":5},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"7f395cf827bb2aa2ef2f34a1de3b26581258fdef48ba7e7f6e3afbb23c2188df","entry_hash":"4220526833ccc616d51cbdd2a9d4ec01840edb5f2462a802cfc3a5e886f08ef7"},{"schema_version":"1.0","seq_id":7,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"coder","to":"planner","team":null,"body":"Capped at 5, pushed. CI green."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":5,"prev_hash":"4220526833ccc616d51cbdd2a9d4ec01840edb5f2462a802cfc3a5e886f08ef7","entry_hash":"7d3defe468c1ac8858eab9ef09fcd1ee8ebdbc19deaac6157f6ac4dc41449c34"},{"schema_version":"1.0","seq_id":8,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"planner","message_seq":7},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"7d3defe468c1ac8858eab9ef09fcd1ee8ebdbc19deaac6157f6ac4dc41449c34","entry_hash":"2c676355321635bc2460f0d973ce326f6c2beffbb26c26e8a94c00f4e61ce990"}]
+</script>
+
+<script>
+  const ORIGINAL = JSON.parse(document.getElementById('ledger').textContent);
+  let working = structuredClone(ORIGINAL);
+  const $ = (id) => document.getElementById(id);
+  const short = (h) => h ? h.slice(0, 8) + '…' + h.slice(-6) : '—';
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  // read receipts: message_seq -> reader
+  const readBy = {};
+  for (const e of ORIGINAL) if (e.tool_name === 'message_read') readBy[e.args.message_seq] = e.args.agent;
+
+  // index of each agent_message within `working`, keyed by seq_id
+  const msgIndex = {};
+  ORIGINAL.forEach((e, i) => { if (e.tool_name === 'agent_message') msgIndex[e.seq_id] = i; });
+
+  let editable = false;
+
+  function buildConvo() {
+    const convo = $('convo');
+    convo.innerHTML = '';
+    for (const e of ORIGINAL) {
+      if (e.tool_name !== 'agent_message') continue;
+      const seq = e.seq_id, side = e.args.from === 'planner' ? 'planner' : 'coder';
+      const turn = document.createElement('div');
+      turn.className = 'turn ' + side;
+      const reader = readBy[seq];
+      turn.innerHTML =
+        `<div class="who">${esc(e.args.from)}</div>` +
+        `<div class="bubble" data-seq="${seq}">${esc(e.args.body)}</div>` +
+        `<div class="meta"><span class="seq">#${seq}</span>` +
+          `<span class="hsh" data-hsh="${seq}">${short(working[msgIndex[seq]].entry_hash)}</span>` +
+          (reader ? `<span class="tick" title="read receipt is its own chained event">✓✓ read by ${esc(reader)}</span>` : '') +
+        `</div>`;
+      convo.appendChild(turn);
+    }
+    wireBubbles();
+  }
+
+  function wireBubbles() {
+    document.querySelectorAll('.bubble').forEach((b) => {
+      const seq = +b.dataset.seq, idx = msgIndex[seq];
+      b.contentEditable = editable ? 'true' : 'false';
+      b.oninput = () => { working[idx].args.body = b.textContent; verify(); };
+    });
+  }
+
+  function renderChain(errs) {
+    const broken = new Set(errs.map((e) => e.seq));
+    const el = $('chain'); el.innerHTML = '';
+    working.forEach((e, i) => {
+      if (i > 0) {
+        const link = document.createElement('div');
+        link.className = 'link' + (broken.has(e.seq_id) || broken.has(working[i - 1].seq_id) ? ' broken' : '');
+        el.appendChild(link);
+      }
+      const blk = document.createElement('div');
+      blk.className = 'blk' + (broken.has(e.seq_id) ? ' broken' : '');
+      const label = e.tool_name === 'agent_message'
+        ? `${e.args.from} → ${e.args.to}` : `read · ${e.args.agent}`;
+      blk.innerHTML = `<span class="seq">#${e.seq_id}</span><span class="tool">${esc(label)}</span>` +
+                      `<span class="h">${short(e.entry_hash)}</span>`;
+      el.appendChild(blk);
+    });
+  }
+
+  async function verify() {
+    const errs = await verifyChain(working);
+    const broken = new Set(errs.map((e) => e.seq));
+    // bubble states + live hash of edited content
+    for (const seq in msgIndex) {
+      const idx = msgIndex[seq];
+      const bub = document.querySelector(`.bubble[data-seq="${seq}"]`);
+      const hsh = document.querySelector(`.hsh[data-hsh="${seq}"]`);
+      const live = await chainHash(working[idx]);  // recomputed from current contents
+      const isBad = broken.has(+seq);
+      if (bub) bub.classList.toggle('tampered', isBad);
+      if (hsh) {
+        hsh.textContent = short(live);
+        hsh.classList.toggle('tampflag', false);
+      }
+      // append a tampered flag in the meta row
+      const meta = bub && bub.nextElementSibling;
+      if (meta) {
+        let flag = meta.querySelector('.tampflag');
+        if (isBad && !flag) {
+          flag = document.createElement('span');
+          flag.className = 'tampflag'; flag.textContent = '✕ hash no longer matches';
+          meta.appendChild(flag);
+        } else if (!isBad && flag) { flag.remove(); }
+      }
+    }
+    renderChain(errs);
+
+    const v = $('verdict');
+    if (errs.length === 0) {
+      v.className = 'verdict ok';
+      $('vtag').textContent = 'INTACT — proof holds';
+      $('vwhy').innerHTML = `Recomputed the SHA-256 hash chain over all <b>${working.length} events</b> locally. ` +
+        `Every message and read receipt matches its hash, in order. This is exactly what a skeptic runs.`;
+    } else {
+      const seqs = [...new Set(errs.map((e) => e.seq))].sort((a, b) => a - b);
+      v.className = 'verdict bad';
+      $('vtag').textContent = 'TAMPERED — proof broke';
+      $('vwhy').innerHTML = `The recomputed chain rejects <b>event #${seqs.join(', #')}</b>: ` +
+        `${esc(errs[0].why)}. The forged words can't reproduce the recorded hash — the edit is exposed. ` +
+        `<b>Restore</b> to make it whole again.`;
+    }
+    $('btnReset').style.display = JSON.stringify(working) === JSON.stringify(ORIGINAL) ? 'none' : '';
+  }
+
+  function setEditable(on) {
+    editable = on;
+    $('editHint').textContent = on ? 'Now click any message and change the words.' : '';
+    $('btnEdit').textContent = on ? '🔒 Stop editing' : 'Make every message editable';
+    wireBubbles();
+    if (on) { const f = document.querySelector('.bubble'); if (f) { f.focus(); } }
+  }
+
+  $('btnEdit').onclick = () => setEditable(!editable);
+
+  $('btnForge').onclick = async () => {
+    setEditable(true);
+    const idx = msgIndex[1];
+    working[idx].args.body = 'Skip the retry helper — just call it once and move on.';
+    const bub = document.querySelector('.bubble[data-seq="1"]');
+    if (bub) { bub.textContent = working[idx].args.body; }
+    await verify();
+    const v = $('verdict'); v.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  $('btnReset').onclick = () => {
+    working = structuredClone(ORIGINAL);
+    buildConvo();
+    verify();
+    $('editHint').textContent = editable ? 'Now click any message and change the words.' : '';
+  };
+
+  buildConvo();
+  verify();
+</script>
+</body>
+</html>
