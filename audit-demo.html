@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>korg-ledger · forensic audit</title>
+<style>
+  :root{
+    --bg:#0a0c0f; --panel:#0f1318; --line:#1d2733; --ink:#c7d2dd; --dim:#6b7a8a;
+    --ok:#37e0a0; --ok-dim:#10543c; --bad:#ff5b5b; --bad-dim:#5a1620;
+    --accent:#7cc5ff; --hash:#8a7cff;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.5}
+  body{
+    background-image:radial-gradient(1200px 600px at 80% -10%, #11202e 0%, transparent 60%),
+                     radial-gradient(900px 500px at -10% 10%, #16121f 0%, transparent 55%);
+    padding:0 0 64px;
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:0 22px}
+  header{padding:54px 0 26px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--dim)}
+  .eyebrow b{color:var(--accent);font-weight:600}
+  h1{font-family:var(--sans);font-weight:700;font-size:30px;letter-spacing:-.01em;margin:14px 0 4px;
+     color:#eef4fa;word-break:break-all}
+  .sub{color:var(--dim)}
+  .sub .k{color:var(--ink)}
+  /* verdict */
+  .verdict{margin:26px 0;border:1px solid var(--line);border-radius:14px;padding:22px 24px;
+           background:linear-gradient(180deg,var(--panel),#0b0e12);position:relative;overflow:hidden}
+  .verdict::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--dim)}
+  .verdict.ok::before{background:var(--ok)} .verdict.bad::before{background:var(--bad)}
+  .verdict .tag{font-family:var(--sans);font-weight:700;font-size:22px;letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+  .verdict.ok .tag{color:var(--ok)} .verdict.bad .tag{color:var(--bad)}
+  .verdict .why{color:var(--dim);margin-top:8px;max-width:62ch}
+  .dot{width:11px;height:11px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(120,255,200,.35)}70%{box-shadow:0 0 0 12px rgba(120,255,200,0)}100%{box-shadow:0 0 0 0 rgba(120,255,200,0)}}
+  .verdict.bad .dot{animation:none}
+  /* sections */
+  h2{font-family:var(--sans);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+     margin:38px 0 14px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .cell{background:var(--panel);padding:14px 16px}
+  .cell .n{font-size:24px;color:#eef4fa;font-variant-numeric:tabular-nums}
+  .cell .l{color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-top:3px}
+  .narr{list-style:none;margin:0;padding:0}
+  .narr li{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #131a22;align-items:baseline}
+  .narr .op{color:var(--accent);min-width:64px;font-size:12px}
+  .narr .op.write{color:var(--ok)} .narr .op.run{color:#ffcf6b} .narr .op.ask{color:var(--hash)}
+  .narr .body{color:var(--ink);word-break:break-all}
+  /* chain */
+  #chain{display:flex;flex-direction:column;gap:0;margin-top:4px}
+  .blk{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+       border-radius:10px;padding:11px 14px}
+  .blk .seq{color:var(--dim);min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+  .blk .tool{color:#eef4fa;min-width:120px}
+  .blk .h{color:var(--hash);font-size:12px;margin-left:auto}
+  .blk.broken{border-color:var(--bad);background:linear-gradient(90deg,var(--bad-dim),var(--panel) 40%)}
+  .blk.broken .tool{color:var(--bad)}
+  .link{height:16px;width:2px;margin-left:31px;background:var(--line)}
+  .link.broken{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  /* tamper test */
+  .tamper{border:1px dashed var(--line);border-radius:14px;padding:20px 22px;background:#0c1116}
+  .tamper p{color:var(--dim);margin:0 0 14px;max-width:64ch}
+  .btns{display:flex;gap:10px;flex-wrap:wrap}
+  button{font-family:var(--mono);font-size:13px;cursor:pointer;border-radius:9px;padding:10px 16px;
+         border:1px solid var(--line);background:#141b22;color:var(--ink);transition:.15s}
+  button:hover{border-color:var(--accent);color:#fff}
+  button.danger{border-color:var(--bad-dim);color:#ffb4b4}
+  button.danger:hover{border-color:var(--bad);background:var(--bad-dim)}
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:12px;max-width:70ch}
+  footer b{color:var(--ink)} a{color:var(--accent)}
+  .mono-note{color:var(--dim);font-size:12px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><b>korg-ledger@v1</b> &nbsp;·&nbsp; forensic cognition audit</div>
+    <h1 id="sessionTitle">session</h1>
+    <div class="sub">
+      <span class="k" id="vendor">—</span> session &nbsp;·&nbsp;
+      <span class="k" id="evCount">0</span> ledger events &nbsp;·&nbsp;
+      verified <span class="k">in your browser</span>, not by the tool that made this
+    </div>
+  </header>
+
+  <div class="verdict" id="verdict">
+    <div class="tag"><span class="dot"></span><span id="verdictTag">verifying…</span></div>
+    <div class="why" id="verdictWhy">Recomputing the SHA-256 hash chain locally…</div>
+  </div>
+
+  <h2>At a glance</h2>
+  <div class="grid" id="stats"></div>
+
+  <h2>What the agent did</h2>
+  <ul class="narr" id="narrative"></ul>
+
+  <h2>The chain</h2>
+  <div id="chain"></div>
+  <div class="mono-note">Each event links to the previous by hash. Edit, delete, reorder, or splice any
+    one and its link — and every link after it — breaks. ↓ prove it yourself.</div>
+
+  <h2>Tamper test</h2>
+  <div class="tamper">
+    <p>This isn't a screenshot of a claim. Press the button: it edits one recorded event in memory and
+      re-runs the same verifier. Watch the verdict flip to <b style="color:var(--bad)">TAMPERED</b> and
+      pinpoint exactly which event broke — then reset.</p>
+    <div class="btns">
+      <button class="danger" id="btnTamper">Tamper with an event &amp; re-verify</button>
+      <button id="btnReset">Reset to the original</button>
+    </div>
+  </div>
+
+  <footer>
+    This page re-derived every <b>entry_hash</b> from the recorded events using the
+    <b>korg-ledger@v1</b> reference verifier — entirely in your browser, with no network calls. It did
+    not trust the tool that generated it. The same algorithm runs in Python, Rust, and JS against frozen
+    conformance vectors. Spec: <a href="https://github.com/New1Direction/korgex">korg-ledger@v1</a>.
+  </footer>
+</div>
+
+<script>
+// korg-ledger@v1 reference verifier — runs in the browser AND in node.
+//
+// Must match src/ledger_spec.py (Python) and the Rust core byte-for-byte.
+// Canonicalization: JSON with keys sorted by code point, separators (",",":"),
+// non-ASCII escaped to \uXXXX (incl. surrogate pairs); preimage = event minus
+// `entry_hash`; digest = SHA-256. Proven against the frozen conformance vectors
+// (basic-intact tip 7418b910…). A skeptic opening an audit report runs THIS.
+
+function jsonString(s) {
+  let out = '"';
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (ch === '"') out += '\\"';
+    else if (ch === '\\') out += '\\\\';
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\r') out += '\\r';
+    else if (ch === '\t') out += '\\t';
+    else if (cp === 0x08) out += '\\b';
+    else if (cp === 0x0c) out += '\\f';
+    else if (cp >= 0x20 && cp <= 0x7e) out += ch;
+    else if (cp > 0xffff) {
+      const v = cp - 0x10000;
+      out += '\\u' + (0xd800 + (v >> 10)).toString(16).padStart(4, '0');
+      out += '\\u' + (0xdc00 + (v & 0x3ff)).toString(16).padStart(4, '0');
+    } else out += '\\u' + cp.toString(16).padStart(4, '0');
+  }
+  return out + '"';
+}
+
+function canonical(v) {
+  if (v === null) return 'null';
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') return jsonString(v);
+  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  return '{' + Object.keys(v).sort().map((k) => jsonString(k) + ':' + canonical(v[k])).join(',') + '}';
+}
+
+const GENESIS = '0'.repeat(64);
+
+async function chainHash(event) {
+  const pre = {};
+  for (const k of Object.keys(event)) if (k !== 'entry_hash') pre[k] = event[k];
+  const bytes = new TextEncoder().encode(canonical(pre)); // canonical() is ASCII-only
+  const buf = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Returns [] when intact; otherwise one entry per detected problem, localized by seq.
+async function verifyChain(events) {
+  const errs = [];
+  let expected = GENESIS;
+  for (const e of events) {
+    if (e.prev_hash !== expected) errs.push({ seq: e.seq_id, why: 'broken link (insert/delete/reorder)' });
+    if ((await chainHash(e)) !== e.entry_hash) errs.push({ seq: e.seq_id, why: 'content tampered' });
+    expected = e.entry_hash;
+  }
+  return errs;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { jsonString, canonical, chainHash, verifyChain, GENESIS };
+}
+
+</script>
+<script>
+const EVENTS = [{"schema_version": "1.0", "seq_id": 1, "source_agent": "korgex", "tool_name": "user_prompt", "args": {"prompt": "date_parse() crashes on empty input \u2014 fix it and add a test"}, "result": {}, "success": true, "duration_ms": 0, "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000", "entry_hash": "b0894d583b84511fa2be0f8f2d09be91e009a9f91608155abe0c642ab7272dac"}, {"schema_version": "1.0", "seq_id": 2, "source_agent": "korgex", "tool_name": "llm_inference", "args": {"model": "claude-sonnet-4-6"}, "result": {"text": "I'll reproduce, guard the empty case, and add a regression test."}, "success": true, "duration_ms": 0, "triggered_by": 1, "prev_hash": "b0894d583b84511fa2be0f8f2d09be91e009a9f91608155abe0c642ab7272dac", "entry_hash": "82565aa041454f8745ef6daea11371e707daa711cc5c1fa8cbad56adc642e6f5"}, {"schema_version": "1.0", "seq_id": 3, "source_agent": "korgex", "tool_name": "Read", "args": {"file_path": "src/dateparse.py"}, "result": {}, "success": true, "duration_ms": 0, "triggered_by": 2, "prev_hash": "82565aa041454f8745ef6daea11371e707daa711cc5c1fa8cbad56adc642e6f5", "entry_hash": "6d7e879e7963bd85f0e1207aa2f9a6f128fa6f7572543332578fd5a48f3ac2ce"}, {"schema_version": "1.0", "seq_id": 4, "source_agent": "korgex", "tool_name": "Bash", "args": {"command": "pytest -k date_parse -q"}, "result": {"exit": 1, "summary": "1 failed \u2014 ValueError on ''"}, "success": true, "duration_ms": 0, "triggered_by": 2, "prev_hash": "6d7e879e7963bd85f0e1207aa2f9a6f128fa6f7572543332578fd5a48f3ac2ce", "entry_hash": "71dfaa8932d127b3b2edad85309c6fd96f1881365f8a97f7efafa7bd1a0627fe"}, {"schema_version": "1.0", "seq_id": 5, "source_agent": "korgex", "tool_name": "llm_inference", "args": {"model": "claude-sonnet-4-6"}, "result": {"text": "Confirmed: empty string hits strptime. Adding an early return."}, "success": true, "duration_ms": 0, "triggered_by": 4, "prev_hash": "71dfaa8932d127b3b2edad85309c6fd96f1881365f8a97f7efafa7bd1a0627fe", "entry_hash": "7a2cf1e80cb97b57ae5f3f5ab1bf9317135f104566d65da0be48014c205a9325"}, {"schema_version": "1.0", "seq_id": 6, "source_agent": "korgex", "tool_name": "Edit", "args": {"file_path": "src/dateparse.py", "what": "guard empty input"}, "result": {"ok": true}, "success": true, "duration_ms": 0, "triggered_by": 5, "prev_hash": "7a2cf1e80cb97b57ae5f3f5ab1bf9317135f104566d65da0be48014c205a9325", "entry_hash": "40b063516a838d131f841137c15a31a0f68c924b8742c15719ab8a84fcda2ffe"}, {"schema_version": "1.0", "seq_id": 7, "source_agent": "korgex", "tool_name": "Write", "args": {"file_path": "tests/test_dateparse.py", "what": "regression test"}, "result": {"ok": true}, "success": true, "duration_ms": 0, "triggered_by": 5, "prev_hash": "40b063516a838d131f841137c15a31a0f68c924b8742c15719ab8a84fcda2ffe", "entry_hash": "3d3e99e0db5b22cbb4e0f44be9b4cd2ae28baf005af50578d548efa6e2a2a718"}, {"schema_version": "1.0", "seq_id": 8, "source_agent": "korgex", "tool_name": "Bash", "args": {"command": "pytest -k date_parse -q"}, "result": {"exit": 0, "summary": "2 passed"}, "success": true, "duration_ms": 0, "triggered_by": 5, "prev_hash": "3d3e99e0db5b22cbb4e0f44be9b4cd2ae28baf005af50578d548efa6e2a2a718", "entry_hash": "0cf647ee5d0dcc90f73a58584d65986bd2e6b7ee07e40936ea4a4013a2736640"}, {"schema_version": "1.0", "seq_id": 9, "source_agent": "korgex", "tool_name": "llm_inference", "args": {"model": "claude-sonnet-4-6"}, "result": {"text": "Green. Empty input now returns None; regression test covers it."}, "success": true, "duration_ms": 0, "triggered_by": 8, "prev_hash": "0cf647ee5d0dcc90f73a58584d65986bd2e6b7ee07e40936ea4a4013a2736640", "entry_hash": "15dae0eda0ff6857271844663c2b46bfbda7e1db4888910fc90880085bd1b326"}];
+const META = {"session": "korgex \u00b7 fix date_parse crash", "vendor": "claude-code", "spec": "korg-ledger@v1", "event_count": 9};
+let working = structuredClone(EVENTS);
+
+const $ = (id) => document.getElementById(id);
+const short = (h) => (h ? h.slice(0, 8) + '…' + h.slice(-6) : '—');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+$('sessionTitle').textContent = META.session || 'session';
+$('vendor').textContent = META.vendor || 'unknown';
+$('evCount').textContent = (META.event_count ?? EVENTS.length).toLocaleString();
+
+function stats(evts) {
+  const tools = {};
+  let writes = 0, cmds = 0, asks = 0;
+  for (const e of evts) {
+    tools[e.tool_name] = (tools[e.tool_name] || 0) + 1;
+    const t = e.tool_name || '';
+    if (/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(t)) writes++;
+    else if (t === 'Bash') cmds++;
+    else if (t === 'user_prompt' || t === 'user_message') asks++;
+  }
+  const distinct = Object.keys(tools).length;
+  const cells = [
+    [evts.length.toLocaleString(), 'events'],
+    [writes.toLocaleString(), 'file edits'],
+    [cmds.toLocaleString(), 'commands'],
+    [distinct.toLocaleString(), 'distinct tools'],
+  ];
+  $('stats').innerHTML = cells.map(([n, l]) => `<div class="cell"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+function narrative(evts) {
+  const rows = [];
+  for (const e of evts) {
+    const a = e.args || {};
+    const t = e.tool_name || '';
+    if (/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(t)) rows.push(['write', a.file_path || a.path || a.notebook_path || '(file)']);
+    else if (t === 'Bash') rows.push(['run', a.command || a.cmd || '(command)']);
+    else if (t === 'user_prompt' || t === 'user_message') rows.push(['ask', a.prompt || a.text || a.content || '(prompt)']);
+    else if (t === 'Read') rows.push(['read', a.file_path || a.path || '(file)']);
+  }
+  const shown = rows.slice(0, 40);
+  $('narrative').innerHTML = shown.map(([op, body]) =>
+    `<li><span class="op ${op === 'write' ? 'write' : op === 'run' ? 'run' : op === 'ask' ? 'ask' : ''}">${op}</span><span class="body">${esc(String(body).slice(0, 160))}</span></li>`
+  ).join('') + (rows.length > shown.length ? `<li><span class="op"></span><span class="body" style="color:var(--dim)">…and ${rows.length - shown.length} more</span></li>` : '');
+}
+
+function renderChain(evts, errs) {
+  const brokenLink = new Set(errs.filter((e) => e.why.includes('link')).map((e) => e.seq));
+  const brokenContent = new Set(errs.filter((e) => e.why.includes('tamper')).map((e) => e.seq));
+  const el = $('chain'); el.innerHTML = '';
+  evts.forEach((e, i) => {
+    if (i > 0) {
+      const link = document.createElement('div');
+      link.className = 'link' + (brokenLink.has(e.seq_id) ? ' broken' : '');
+      el.appendChild(link);
+    }
+    const broken = brokenLink.has(e.seq_id) || brokenContent.has(e.seq_id);
+    const blk = document.createElement('div');
+    blk.className = 'blk' + (broken ? ' broken' : '');
+    blk.innerHTML = `<span class="seq">#${e.seq_id}</span><span class="tool">${esc(e.tool_name || '?')}</span><span class="h">${short(e.entry_hash)}</span>`;
+    el.appendChild(blk);
+  });
+}
+
+async function verifyAndRender() {
+  stats(working);
+  narrative(working);
+  const errs = await verifyChain(working);
+  renderChain(working, errs);
+  const v = $('verdict'), tag = $('verdictTag'), why = $('verdictWhy');
+  if (errs.length === 0) {
+    v.className = 'verdict ok'; tag.textContent = 'CHAIN INTACT';
+    why.textContent = 'Every event hashes to its recorded entry_hash and links unbroken from genesis. This record was not edited, deleted, reordered, or spliced after the fact — re-verified locally just now.';
+  } else {
+    v.className = 'verdict bad'; tag.textContent = 'TAMPERED — ' + errs.length + ' issue' + (errs.length > 1 ? 's' : '');
+    const where = [...new Set(errs.map((e) => '#' + e.seq))].join(', ');
+    why.textContent = 'The local hash chain does not match the recorded hashes. First break at event ' + where + '. ' + errs.map((e) => '#' + e.seq + ': ' + e.why).slice(0, 3).join('  ·  ');
+  }
+}
+
+$('btnTamper').onclick = async () => {
+  if (!working.length) return;
+  const i = Math.min(1, working.length - 1); // pick an event mid-chain when possible
+  working = structuredClone(EVENTS);
+  working[i] = JSON.parse(JSON.stringify(working[i]));
+  working[i].args = Object.assign({}, working[i].args, { _injected: 'an attacker edited this event' });
+  // entry_hash left unchanged on purpose → the recomputed hash will no longer match
+  await verifyAndRender();
+};
+$('btnReset').onclick = async () => { working = structuredClone(EVENTS); await verifyAndRender(); };
+
+verifyAndRender();
+</script>
+</body>
+</html>

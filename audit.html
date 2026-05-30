@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KORG — PROVE WHAT YOUR AI DID</title>
+<meta name="description" content="A tamper-evident record of an AI agent session that verifies itself in the recipient's browser. Zero config — audit the logs you already have. korgex audit --html.">
+<link rel="preconnect" href="https://fonts.cdnfonts.com">
+<link rel="stylesheet" href="https://fonts.cdnfonts.com/css/d-din">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#000; --night-soft:#0a0a0a; --paper:#fff;
+    --ink:#fff; --ink-mute:#8a8a92; --hairline:#2a2a30;
+    --ok:#37e0a0; --hash:#9a8cff;
+    --font-display:'D-DIN','Arial Narrow',Arial,sans-serif;
+    --font-mono:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--night);color:var(--ink);font-family:var(--font-mono);font-size:15px;line-height:1.6;
+       -webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .container{max-width:1120px;margin:0 auto;padding:0 32px}
+  /* nav */
+  nav.top{display:flex;align-items:center;justify-content:space-between;height:72px;border-bottom:1px solid var(--hairline)}
+  .logo{font-family:var(--font-display);font-weight:700;letter-spacing:2px;font-size:20px;display:flex;align-items:center;gap:8px}
+  .logo .mark{width:7px;height:7px;background:var(--ok);border-radius:50%;display:inline-block}
+  nav.top .links{display:flex;gap:28px;font-size:12.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-mute)}
+  nav.top .links a:hover{color:var(--ink)}
+  /* hero */
+  .hero{padding:96px 0 56px;border-bottom:1px solid var(--hairline);position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;inset:auto -10% -60% 40%;height:520px;
+    background:radial-gradient(closest-side, rgba(55,224,160,.10), transparent 70%);pointer-events:none}
+  .eyebrow{font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:var(--ink-mute)}
+  .eyebrow b{color:var(--ok);font-weight:600}
+  h1{font-family:var(--font-display);font-weight:700;font-size:clamp(48px,8vw,92px);line-height:.94;
+     letter-spacing:1px;margin:22px 0 0;text-transform:uppercase}
+  h1 .thin{color:var(--ink-mute)}
+  .lede{font-size:20px;line-height:1.5;max-width:60ch;color:#d4d4dc;margin:28px 0 0}
+  .lede b{color:#fff;font-weight:500}
+  /* command */
+  .cmd{display:inline-flex;align-items:center;gap:14px;margin-top:34px;padding:16px 22px;
+       border:1px solid var(--hairline);border-radius:12px;background:var(--night-soft);font-size:16px}
+  .cmd .p{color:var(--ok)} .cmd .c{color:#fff}
+  .cmd .hint{color:var(--ink-mute);font-size:12.5px;letter-spacing:.04em;border-left:1px solid var(--hairline);padding-left:14px}
+  /* proof frame */
+  .proof{padding:64px 0 24px}
+  .proof h2{font-family:var(--font-display);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-mute);font-weight:600}
+  .proof .sub{color:var(--ink-mute);margin:8px 0 22px;max-width:70ch}
+  .proof .sub b{color:var(--ok)}
+  .frame{border:1px solid var(--hairline);border-radius:16px;overflow:hidden;background:#0a0c0f;
+         box-shadow:0 30px 80px -40px rgba(55,224,160,.25)}
+  .frame .bar{display:flex;align-items:center;gap:8px;height:42px;padding:0 16px;border-bottom:1px solid var(--hairline);
+              background:#0d0f13;color:var(--ink-mute);font-size:12px}
+  .frame .bar .dot{width:11px;height:11px;border-radius:50%;background:#22252c}
+  .frame .bar .url{margin-left:14px;font-size:12px}
+  .frame .bar .open{margin-left:auto}
+  .frame .bar .open a{color:var(--ink-mute)} .frame .bar .open a:hover{color:var(--ok)}
+  iframe{width:100%;height:680px;border:0;display:block;background:#0a0c0f}
+  /* features */
+  .feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hairline);
+                border:1px solid var(--hairline);border-radius:14px;overflow:hidden;margin:56px 0}
+  .feature{background:var(--night);padding:28px 26px}
+  .feature .n{font-family:var(--font-display);color:var(--ok);font-size:13px;letter-spacing:.15em}
+  .feature h3{font-family:var(--font-display);font-size:21px;letter-spacing:.5px;margin:12px 0 8px;text-transform:uppercase}
+  .feature p{color:var(--ink-mute);font-size:14px;line-height:1.55}
+  /* closing */
+  .closing{padding:60px 0 30px;border-top:1px solid var(--hairline);text-align:center}
+  .closing h2{font-family:var(--font-display);font-size:clamp(28px,4vw,42px);letter-spacing:1px;text-transform:uppercase;line-height:1.05}
+  .pills{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .pill{border:1px solid var(--hairline);border-radius:999px;padding:13px 24px;font-size:12.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-mute);transition:.15s}
+  .pill:hover{border-color:var(--ok);color:#fff}
+  .pill.solid{border-color:var(--ok);color:var(--ok)}
+  footer{border-top:1px solid var(--hairline);padding:40px 0;color:var(--ink-mute);font-size:12.5px;
+         display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
+  footer a:hover{color:var(--ink)}
+  @media(max-width:760px){.feature-grid{grid-template-columns:1fr}nav.top .links a:not(:last-child){display:none}iframe{height:560px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <nav class="top">
+    <a href="/" class="logo">KORG <span class="mark"></span></a>
+    <div class="links">
+      <a href="/">Home</a>
+      <a href="#proof">The proof</a>
+      <a href="https://github.com/New1Direction/korgex">korgex</a>
+      <a href="https://github.com/New1Direction/korgex">GitHub</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="eyebrow"><b>korg-ledger@v1</b> &nbsp;·&nbsp; verifiable cognition</div>
+    <h1>Prove what<br>your <span class="thin">AI</span> did.</h1>
+    <p class="lede">Every coding agent leaves a log you're asked to trust. <b>korgex</b> turns that log into
+      a <b>tamper-evident record</b> — hash-chained, causally ordered, and able to prove itself
+      <b>in the recipient's own browser</b>. Audit the sessions you already have. Hand someone a proof,
+      not a promise.</p>
+    <div class="cmd">
+      <span class="p">uvx</span>&nbsp;<span class="c">korgex audit --html audit.html</span>
+      <span class="hint">zero config — reads your Claude&nbsp;Code logs</span>
+    </div>
+  </section>
+
+  <section class="proof" id="proof">
+    <h2>↓ A real session, re-verifying itself live</h2>
+    <p class="sub">This is the output of one command on an agent session. The page below re-derives every
+      hash <b>on your machine</b> — it doesn't trust the tool that made it. Scroll inside it to the
+      <b>Tamper test</b> and break the chain yourself.</p>
+    <div class="frame">
+      <div class="bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="url">audit.html — self-contained, no network</span>
+        <span class="open"><a href="/audit-demo.html" target="_blank">open full screen ↗</a></span>
+      </div>
+      <iframe src="/audit-demo.html" title="Live self-verifying korg-ledger audit report" loading="lazy"></iframe>
+    </div>
+  </section>
+
+  <section class="feature-grid">
+    <div class="feature">
+      <div class="n">01</div>
+      <h3>Zero buy-in</h3>
+      <p>No SDK, no rewrite, no account. Point it at the agent logs you already have and get a verifiable
+        chain back in one command.</p>
+    </div>
+    <div class="feature">
+      <div class="n">02</div>
+      <h3>Self-verifying</h3>
+      <p>The report carries the reference verifier and re-checks the hash chain in whoever opens it. They
+        never have to trust korgex — the math runs on their side.</p>
+    </div>
+    <div class="feature">
+      <div class="n">03</div>
+      <h3>Break it yourself</h3>
+      <p>One click edits a recorded event and the chain snaps — localized to the exact step. Tamper-evidence
+        you can feel, not a claim you have to take.</p>
+    </div>
+  </section>
+
+  <section class="closing">
+    <h2>Stop trusting the log.<br>Start checking it.</h2>
+    <div class="pills">
+      <a class="pill solid" href="https://pypi.org/project/korgex/">pip install korgex</a>
+      <a class="pill" href="/audit-demo.html" target="_blank">Open the live proof ↗</a>
+      <a class="pill" href="/ledger-explorer.html">Tamper a ledger →</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>korg-ledger@v1 — an open, conformance-tested cognition ledger. Python · Rust · JS.</span>
+    <span><a href="https://github.com/New1Direction/korgex">korgex</a> &nbsp;·&nbsp;
+      <a href="https://github.com/New1Direction/korg">korg</a> &nbsp;·&nbsp;
+      <a href="https://github.com/New1Direction/thumper">thumper</a></span>
+  </footer>
+
+</div>
+</body>
+</html>
