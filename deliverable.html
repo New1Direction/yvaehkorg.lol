@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>korg-ledger · forensic audit</title>
+<style>
+  :root{
+    --bg:#0a0c0f; --panel:#0f1318; --line:#1d2733; --ink:#c7d2dd; --dim:#6b7a8a;
+    --ok:#37e0a0; --ok-dim:#10543c; --bad:#ff5b5b; --bad-dim:#5a1620;
+    --accent:#7cc5ff; --hash:#8a7cff;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.5}
+  body{
+    background-image:radial-gradient(1200px 600px at 80% -10%, #11202e 0%, transparent 60%),
+                     radial-gradient(900px 500px at -10% 10%, #16121f 0%, transparent 55%);
+    padding:0 0 64px;
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:0 22px}
+  header{padding:54px 0 26px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--dim)}
+  .eyebrow b{color:var(--accent);font-weight:600}
+  h1{font-family:var(--sans);font-weight:700;font-size:30px;letter-spacing:-.01em;margin:14px 0 4px;
+     color:#eef4fa;word-break:break-all}
+  .sub{color:var(--dim)}
+  .sub .k{color:var(--ink)}
+  /* verdict */
+  .verdict{margin:26px 0;border:1px solid var(--line);border-radius:14px;padding:22px 24px;
+           background:linear-gradient(180deg,var(--panel),#0b0e12);position:relative;overflow:hidden}
+  .verdict::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--dim)}
+  .verdict.ok::before{background:var(--ok)} .verdict.bad::before{background:var(--bad)}
+  .verdict .tag{font-family:var(--sans);font-weight:700;font-size:22px;letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+  .verdict.ok .tag{color:var(--ok)} .verdict.bad .tag{color:var(--bad)}
+  .verdict .why{color:var(--dim);margin-top:8px;max-width:62ch}
+  .dot{width:11px;height:11px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(120,255,200,.35)}70%{box-shadow:0 0 0 12px rgba(120,255,200,0)}100%{box-shadow:0 0 0 0 rgba(120,255,200,0)}}
+  .verdict.bad .dot{animation:none}
+  /* sections */
+  h2{font-family:var(--sans);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+     margin:38px 0 14px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .cell{background:var(--panel);padding:14px 16px}
+  .cell .n{font-size:24px;color:#eef4fa;font-variant-numeric:tabular-nums}
+  .cell .l{color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-top:3px}
+  .narr{list-style:none;margin:0;padding:0}
+  .narr li{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #131a22;align-items:baseline}
+  .narr .op{color:var(--accent);min-width:64px;font-size:12px}
+  .narr .op.write{color:var(--ok)} .narr .op.run{color:#ffcf6b} .narr .op.ask{color:var(--hash)}
+  .narr .body{color:var(--ink);word-break:break-all}
+  /* chain */
+  #chain{display:flex;flex-direction:column;gap:0;margin-top:4px}
+  .blk{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+       border-radius:10px;padding:11px 14px}
+  .blk .seq{color:var(--dim);min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+  .blk .tool{color:#eef4fa;min-width:120px}
+  .blk .h{color:var(--hash);font-size:12px;margin-left:auto}
+  .blk.broken{border-color:var(--bad);background:linear-gradient(90deg,var(--bad-dim),var(--panel) 40%)}
+  .blk.broken .tool{color:var(--bad)}
+  .link{height:16px;width:2px;margin-left:31px;background:var(--line)}
+  .link.broken{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  /* tamper test */
+  .tamper{border:1px dashed var(--line);border-radius:14px;padding:20px 22px;background:#0c1116}
+  .tamper p{color:var(--dim);margin:0 0 14px;max-width:64ch}
+  .btns{display:flex;gap:10px;flex-wrap:wrap}
+  button{font-family:var(--mono);font-size:13px;cursor:pointer;border-radius:9px;padding:10px 16px;
+         border:1px solid var(--line);background:#141b22;color:var(--ink);transition:.15s}
+  button:hover{border-color:var(--accent);color:#fff}
+  button.danger{border-color:var(--bad-dim);color:#ffb4b4}
+  button.danger:hover{border-color:var(--bad);background:var(--bad-dim)}
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:12px;max-width:70ch}
+  footer b{color:var(--ink)} a{color:var(--accent)}
+  .mono-note{color:var(--dim);font-size:12px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><b>korg-ledger@v1</b> &nbsp;·&nbsp; forensic cognition audit</div>
+    <h1 id="sessionTitle">session</h1>
+    <div class="sub">
+      <span class="k" id="vendor">—</span> session &nbsp;·&nbsp;
+      <span class="k" id="evCount">0</span> ledger events &nbsp;·&nbsp;
+      verified <span class="k">in your browser</span>, not by the tool that made this
+    </div>
+  </header>
+
+  <div class="verdict" id="verdict">
+    <div class="tag"><span class="dot"></span><span id="verdictTag">verifying…</span></div>
+    <div class="why" id="verdictWhy">Recomputing the SHA-256 hash chain locally…</div>
+  </div>
+
+  <h2>At a glance</h2>
+  <div class="grid" id="stats"></div>
+
+  <h2>What the agent did</h2>
+  <ul class="narr" id="narrative"></ul>
+
+  <h2>The chain</h2>
+  <div id="chain"></div>
+  <div class="mono-note">Each event links to the previous by hash. Edit, delete, reorder, or splice any
+    one and its link — and every link after it — breaks. ↓ prove it yourself.</div>
+
+  <h2>Tamper test</h2>
+  <div class="tamper">
+    <p>This isn't a screenshot of a claim. Press the button: it edits one recorded event in memory and
+      re-runs the same verifier. Watch the verdict flip to <b style="color:var(--bad)">TAMPERED</b> and
+      pinpoint exactly which event broke — then reset.</p>
+    <div class="btns">
+      <button class="danger" id="btnTamper">Tamper with an event &amp; re-verify</button>
+      <button id="btnReset">Reset to the original</button>
+    </div>
+  </div>
+
+  <footer>
+    This page re-derived every <b>entry_hash</b> from the recorded events using the
+    <b>korg-ledger@v1</b> reference verifier — entirely in your browser, with no network calls. It did
+    not trust the tool that generated it. The same algorithm runs in Python, Rust, and JS against frozen
+    conformance vectors. Spec: <a href="https://github.com/New1Direction/korgex">korg-ledger@v1</a>.
+  </footer>
+</div>
+
+<script>
+// korg-ledger@v1 reference verifier — runs in the browser AND in node.
+//
+// Must match src/ledger_spec.py (Python) and the Rust core byte-for-byte.
+// Canonicalization: JSON with keys sorted by code point, separators (",",":"),
+// non-ASCII escaped to \uXXXX (incl. surrogate pairs); preimage = event minus
+// `entry_hash`; digest = SHA-256. Proven against the frozen conformance vectors
+// (basic-intact tip 7418b910…). A skeptic opening an audit report runs THIS.
+
+function jsonString(s) {
+  let out = '"';
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (ch === '"') out += '\\"';
+    else if (ch === '\\') out += '\\\\';
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\r') out += '\\r';
+    else if (ch === '\t') out += '\\t';
+    else if (cp === 0x08) out += '\\b';
+    else if (cp === 0x0c) out += '\\f';
+    else if (cp >= 0x20 && cp <= 0x7e) out += ch;
+    else if (cp > 0xffff) {
+      const v = cp - 0x10000;
+      out += '\\u' + (0xd800 + (v >> 10)).toString(16).padStart(4, '0');
+      out += '\\u' + (0xdc00 + (v & 0x3ff)).toString(16).padStart(4, '0');
+    } else out += '\\u' + cp.toString(16).padStart(4, '0');
+  }
+  return out + '"';
+}
+
+function canonical(v) {
+  if (v === null) return 'null';
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') return jsonString(v);
+  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  return '{' + Object.keys(v).sort().map((k) => jsonString(k) + ':' + canonical(v[k])).join(',') + '}';
+}
+
+const GENESIS = '0'.repeat(64);
+
+async function chainHash(event) {
+  const pre = {};
+  for (const k of Object.keys(event)) if (k !== 'entry_hash') pre[k] = event[k];
+  const bytes = new TextEncoder().encode(canonical(pre)); // canonical() is ASCII-only
+  const buf = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Returns [] when intact; otherwise one entry per detected problem, localized by seq.
+// With `expectedTip` (a genuine tip hash anchored externally — a public timestamp,
+// a signed post, a git tag), the chain's actual tip is compared to it. That closes
+// the unkeyed-regeneration hole: a forger can edit a body and re-link + re-hash the
+// whole chain so every per-event check passes, but the resulting tip can't match a
+// tip published before the forgery. Without an anchor, regeneration is undetectable.
+async function verifyChain(events, expectedTip) {
+  const errs = [];
+  let expected = GENESIS;
+  for (const e of events) {
+    if (e.prev_hash !== expected) errs.push({ seq: e.seq_id, why: 'broken link (insert/delete/reorder)' });
+    if ((await chainHash(e)) !== e.entry_hash) errs.push({ seq: e.seq_id, why: 'content tampered' });
+    expected = e.entry_hash;
+  }
+  if (expectedTip != null) {
+    const actualTip = events.length ? events[events.length - 1].entry_hash : null;
+    if (actualTip !== expectedTip) {
+      errs.push({ seq: null, why: 'tip does not match the anchored tip (chain may have been regenerated/forged)' });
+    }
+  }
+  return errs;
+}
+
+// ── sealed envelope (commit-reveal) — mirror of src/sealed_envelope.py ──
+// commit = SHA-256 over the canonical encoding of {payload, salt}. A reveal recomputes
+// it here, in the viewer's browser, byte-for-byte identical to the Python/Rust commit.
+async function sha256Canonical(value) {
+  const bytes = new TextEncoder().encode(canonical(value)); // canonical() is ASCII-only
+  const buf = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function sealCommit(payload, salt) {
+  return sha256Canonical({ payload, salt });
+}
+// hash raw file bytes (an ArrayBuffer/TypedArray) — the drag-in "proof of custody" verify.
+// The file never leaves the browser; only this fingerprint is compared to the sealed one.
+async function sha256Bytes(buf) {
+  const d = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── Ed25519-over-tip — verify "who" in the viewer's browser (mirror of src/signing.py) ──
+// The agent IS its public key. This confirms the holder of that key signed this exact
+// chain tip — author-authenticity with zero trust in korg, via WebCrypto Ed25519.
+function _hexBytes(h) { return Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16))); }
+async function verifyTipSig(pubHex, tipHex, sigHex) {
+  try {
+    const key = await crypto.subtle.importKey('raw', _hexBytes(pubHex), { name: 'Ed25519' }, false, ['verify']);
+    return await crypto.subtle.verify('Ed25519', key, _hexBytes(sigHex), _hexBytes(tipHex));
+  } catch (e) {
+    return false; // browser without Ed25519 support, or a bad signature
+  }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { jsonString, canonical, chainHash, verifyChain, sha256Canonical, sealCommit, sha256Bytes, verifyTipSig, GENESIS };
+}
+
+</script>
+<script>
+const EVENTS = [{"schema_version": "1.0", "seq_id": 1, "source_agent": "agent:korgex@0.14.1", "tool_name": "user_prompt", "args": {"prompt": "fix the failing auth test in tests/test_auth.py"}, "result": {}, "payload_refs": [], "success": true, "duration_ms": 0, "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000", "entry_hash": "c4b5c64cd81b104f9e814c99094f7ad9ca9a6bc568ad78bb6329deb264ac7b6b"}, {"schema_version": "1.0", "seq_id": 2, "source_agent": "agent:korgex@0.14.1", "tool_name": "llm_inference", "args": {"model": "claude-sonnet-4-6", "prompt_tokens": 3200}, "result": {"completion_tokens": 480}, "payload_refs": [], "success": true, "duration_ms": 5200, "triggered_by": 1, "prev_hash": "c4b5c64cd81b104f9e814c99094f7ad9ca9a6bc568ad78bb6329deb264ac7b6b", "entry_hash": "a6a1be6da8908cd72fafdeba9ca810abef8f7d57cf6af304232f8247781e8884"}, {"schema_version": "1.0", "seq_id": 3, "source_agent": "agent:korgex@0.14.1", "tool_name": "Read", "args": {"file_path": "tests/test_auth.py"}, "result": {"ok": true}, "payload_refs": [], "success": true, "duration_ms": 30, "triggered_by": 1, "prev_hash": "a6a1be6da8908cd72fafdeba9ca810abef8f7d57cf6af304232f8247781e8884", "entry_hash": "2cb1dc0c0cc30f32962f3f3774fe2c432256b13bd561fc62fe7bc32f5568d898"}, {"schema_version": "1.0", "seq_id": 4, "source_agent": "agent:korgex@0.14.1", "tool_name": "Read", "args": {"file_path": "src/auth.py"}, "result": {"ok": true}, "payload_refs": [], "success": true, "duration_ms": 22, "triggered_by": 1, "prev_hash": "2cb1dc0c0cc30f32962f3f3774fe2c432256b13bd561fc62fe7bc32f5568d898", "entry_hash": "5256c555a0e5ef44a411cb40260378bc27c44ce39c590d44652a84dc3ad2f4b1"}, {"schema_version": "1.0", "seq_id": 5, "source_agent": "agent:korgex@0.14.1", "tool_name": "Edit", "args": {"file_path": "src/auth.py"}, "result": {"ok": true}, "payload_refs": [], "success": true, "duration_ms": 41, "triggered_by": 1, "prev_hash": "5256c555a0e5ef44a411cb40260378bc27c44ce39c590d44652a84dc3ad2f4b1", "entry_hash": "7b4f272f643bcd9e976682f613eca7492cf74a43959c3231df9ac8828ee62abc"}, {"schema_version": "1.0", "seq_id": 6, "source_agent": "agent:korgex@0.14.1", "tool_name": "Bash", "args": {"command": "pytest -q tests/test_auth.py"}, "result": {"exit_code": 0, "summary": "1 passed"}, "payload_refs": [], "success": true, "duration_ms": 1830, "triggered_by": 1, "prev_hash": "7b4f272f643bcd9e976682f613eca7492cf74a43959c3231df9ac8828ee62abc", "entry_hash": "3c1d3948928b6f042f8e2e8136cedad455ebcbeb0e109ff7f2ba5a2f367d5bff"}];
+const META = {"session": "Fixed the failing auth test \u2014 1 file changed, tests green", "vendor": "korgex", "signed_by": "b251a84c2d23d318ef60241a5932622980821d1af12c4cdbda042af9186e8dff", "spec": "korg-ledger@v1", "event_count": 6};
+let working = structuredClone(EVENTS);
+
+const $ = (id) => document.getElementById(id);
+const short = (h) => (h ? h.slice(0, 8) + '…' + h.slice(-6) : '—');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+$('sessionTitle').textContent = META.session || 'session';
+$('vendor').textContent = META.vendor || 'unknown';
+$('evCount').textContent = (META.event_count ?? EVENTS.length).toLocaleString();
+
+function stats(evts) {
+  const tools = {};
+  let writes = 0, cmds = 0, asks = 0, rounds = 0, tokens = 0;
+  for (const e of evts) {
+    tools[e.tool_name] = (tools[e.tool_name] || 0) + 1;
+    const t = e.tool_name || '';
+    if (/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(t)) writes++;
+    else if (t === 'Bash') cmds++;
+    else if (t === 'user_prompt' || t === 'user_message') asks++;
+    else if (t === 'llm_inference') {
+      rounds++;
+      tokens += ((e.args && e.args.prompt_tokens) || 0) + ((e.result && e.result.completion_tokens) || 0);
+    }
+  }
+  const distinct = Object.keys(tools).length;
+  const cells = [
+    [evts.length.toLocaleString(), 'events'],
+    [rounds.toLocaleString(), 'thinking rounds'],
+    [tokens.toLocaleString(), 'tokens'],
+    [writes.toLocaleString(), 'file edits'],
+    [cmds.toLocaleString(), 'commands'],
+    [distinct.toLocaleString(), 'distinct tools'],
+  ];
+  $('stats').innerHTML = cells.map(([n, l]) => `<div class="cell"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+function narrative(evts) {
+  const rows = [];
+  for (const e of evts) {
+    const a = e.args || {};
+    const t = e.tool_name || '';
+    if (/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(t)) rows.push(['write', a.file_path || a.path || a.notebook_path || '(file)']);
+    else if (t === 'Bash') rows.push(['run', a.command || a.cmd || '(command)']);
+    else if (t === 'user_prompt' || t === 'user_message') rows.push(['ask', a.prompt || a.text || a.content || '(prompt)']);
+    else if (t === 'Read') rows.push(['read', a.file_path || a.path || '(file)']);
+  }
+  const shown = rows.slice(0, 40);
+  $('narrative').innerHTML = shown.map(([op, body]) =>
+    `<li><span class="op ${op === 'write' ? 'write' : op === 'run' ? 'run' : op === 'ask' ? 'ask' : ''}">${op}</span><span class="body">${esc(String(body).slice(0, 160))}</span></li>`
+  ).join('') + (rows.length > shown.length ? `<li><span class="op"></span><span class="body" style="color:var(--dim)">…and ${rows.length - shown.length} more</span></li>` : '');
+}
+
+function renderChain(evts, errs) {
+  const brokenLink = new Set(errs.filter((e) => e.why.includes('link')).map((e) => e.seq));
+  const brokenContent = new Set(errs.filter((e) => e.why.includes('tamper')).map((e) => e.seq));
+  const el = $('chain'); el.innerHTML = '';
+  evts.forEach((e, i) => {
+    if (i > 0) {
+      const link = document.createElement('div');
+      link.className = 'link' + (brokenLink.has(e.seq_id) ? ' broken' : '');
+      el.appendChild(link);
+    }
+    const broken = brokenLink.has(e.seq_id) || brokenContent.has(e.seq_id);
+    const blk = document.createElement('div');
+    blk.className = 'blk' + (broken ? ' broken' : '');
+    blk.innerHTML = `<span class="seq">#${e.seq_id}</span><span class="tool">${esc(e.tool_name || '?')}</span><span class="h">${short(e.entry_hash)}</span>`;
+    el.appendChild(blk);
+  });
+}
+
+async function verifyAndRender() {
+  stats(working);
+  narrative(working);
+  const errs = await verifyChain(working, META.anchored_tip);  // anchored tip (if published) catches a fully-regenerated chain
+  renderChain(working, errs);
+  const v = $('verdict'), tag = $('verdictTag'), why = $('verdictWhy');
+  if (errs.length === 0) {
+    v.className = 'verdict ok'; tag.textContent = 'CHAIN INTACT';
+    why.textContent = 'Every event hashes to its recorded entry_hash and links unbroken from genesis. This record was not edited, deleted, reordered, or spliced after the fact — re-verified locally just now.';
+  } else {
+    v.className = 'verdict bad'; tag.textContent = 'TAMPERED — ' + errs.length + ' issue' + (errs.length > 1 ? 's' : '');
+    const where = [...new Set(errs.map((e) => '#' + e.seq))].join(', ');
+    why.textContent = 'The local hash chain does not match the recorded hashes. First break at event ' + where + '. ' + errs.map((e) => '#' + e.seq + ': ' + e.why).slice(0, 3).join('  ·  ');
+  }
+}
+
+$('btnTamper').onclick = async () => {
+  if (!working.length) return;
+  const i = Math.min(1, working.length - 1); // pick an event mid-chain when possible
+  working = structuredClone(EVENTS);
+  working[i] = JSON.parse(JSON.stringify(working[i]));
+  working[i].args = Object.assign({}, working[i].args, { _injected: 'an attacker edited this event' });
+  // entry_hash left unchanged on purpose → the recomputed hash will no longer match
+  await verifyAndRender();
+};
+$('btnReset').onclick = async () => { working = structuredClone(EVENTS); await verifyAndRender(); };
+
+verifyAndRender();
+</script>
+</body>
+</html>

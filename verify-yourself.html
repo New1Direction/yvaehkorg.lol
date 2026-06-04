@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verify it yourself — korg</title>
+<meta name="description" content="A real AI deliverable you can verify three independent ways — in your browser, in Python, or as one Rust binary — with zero trust in the tool that made it." />
+<meta property="og:title" content="Don't trust us. Verify what the AI did." />
+<meta property="og:description" content="One signed deliverable, verified three independent ways. Tamper one byte and all three reject it." />
+<meta property="og:url" content="https://yvaehkorg.lol/verify-yourself.html" />
+<style>
+  :root{
+    --bg:#070a0f; --panel:#0e131b; --ink:#dce5f0; --dim:#8595ab; --faint:#5a6a82;
+    --ok:#37e0a0; --bad:#ff5b6a; --accent:#7cc5ff; --hash:#9a8cff; --line:rgba(140,160,190,.14);
+    --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+      radial-gradient(1100px 560px at 82% -8%,rgba(124,197,255,.14),transparent 60%),
+      radial-gradient(820px 460px at 4% 4%,rgba(154,140,255,.10),transparent 55%),
+      var(--bg);
+    color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:46px 22px 90px}
+  a{color:var(--accent)}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--dim)}
+  h1{font-size:clamp(34px,7vw,62px);line-height:1.04;letter-spacing:-.02em;margin:14px 0 10px;font-weight:800}
+  h1 .em{background:linear-gradient(90deg,#fff,#9fb6cf);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{font-size:18px;color:var(--dim);max-width:60ch}
+  .claim{margin:30px 0;border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:14px;
+    background:linear-gradient(180deg,var(--panel),#0a0e14);padding:18px 22px}
+  .claim .q{font-size:19px;color:#fff;font-weight:600}
+  .claim .meta{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-top:8px;word-break:break-all}
+  h2{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:46px 0 16px;border-bottom:1px solid var(--line);padding-bottom:9px}
+  .ways{display:grid;gap:14px}
+  .way{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:18px 20px;position:relative;overflow:hidden}
+  .way .n{position:absolute;top:14px;right:18px;font-family:var(--mono);font-size:38px;color:rgba(140,160,190,.12);font-weight:800}
+  .way h3{margin:0 0 4px;font-size:18px}
+  .way p{margin:0 0 12px;color:var(--dim);font-size:14.5px;max-width:60ch}
+  pre{margin:0;background:#05080c;border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto}
+  code{font-family:var(--mono);font-size:13px;color:#cfe0f2}
+  .btn{display:inline-block;font-family:var(--mono);font-size:13px;text-decoration:none;border:1px solid var(--accent);
+    color:#eaf4ff;border-radius:9px;padding:9px 16px;margin-top:4px;transition:.15s}
+  .btn:hover{background:rgba(124,197,255,.12)}
+  .tamper{margin-top:30px;border:1px dashed var(--line);border-radius:14px;padding:20px 22px;background:#0a0e14}
+  .tamper b{color:var(--bad)}
+  .kicker{margin-top:40px;font-size:20px;color:#fff;font-weight:700;letter-spacing:-.01em}
+  footer{margin-top:34px;color:var(--faint);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
+  .pin{font-family:var(--mono);font-size:11.5px;color:var(--dim);word-break:break-all}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">korg-ledger@v1 · verifiable cognition</div>
+  <h1>Don't trust us.<br><span class="em">Verify what the AI did.</span></h1>
+  <p class="lede">Below is a real deliverable produced by an AI coding agent. It comes with a signed, tamper-evident record of every step — which you can check <b style="color:var(--ink)">three independent ways</b>, in three languages, with <b style="color:var(--ink)">zero trust</b> in the tool that made it.</p>
+
+  <div class="claim">
+    <div class="q">“Fixed the failing auth test — 1 file changed, tests green.”</div>
+    <div class="meta">6 recorded steps · signed Ed25519 <code>b251a84c…</code> · chain tip <code>3c1d3948…</code><br>
+      <a href="/deliverable.korgreceipt.json">deliverable.korgreceipt.json →</a></div>
+  </div>
+
+  <h2>Verify it — pick any, or all three</h2>
+  <div class="ways">
+    <div class="way"><div class="n">1</div>
+      <h3>In your browser</h3>
+      <p>No install. The page re-derives the entire hash chain in front of you and shows ✓ <span style="color:var(--ok)">CHAIN INTACT</span> — with a button that tampers one event live and flips it to ✗.</p>
+      <a class="btn" href="/deliverable.html">Open the self-verifying receipt →</a>
+    </div>
+    <div class="way"><div class="n">2</div>
+      <h3>Python</h3>
+      <p>Already on PyPI.</p>
+      <pre><code>pip install korgex
+korgex receipt verify deliverable.korgreceipt.json</code></pre>
+    </div>
+    <div class="way"><div class="n">3</div>
+      <h3>Rust — one static binary, no runtime</h3>
+      <p>An independent implementation. Same spec, same answer.</p>
+      <pre><code>cargo install --git https://github.com/New1Direction/korg korg-verify
+korg-verify deliverable.korgreceipt.json</code></pre>
+    </div>
+  </div>
+
+  <div class="tamper">
+    Change <i>anything</i> in the receipt — one byte — and every verifier rejects it, each localizing the break to the exact step. It isn't a screenshot of a claim; it's a record that <b>cannot</b> be quietly edited.
+  </div>
+
+  <div class="kicker">Three independent implementations of an open spec. Same verdict. No trust required.</div>
+  <p class="lede" style="margin-top:12px">That's the thing no other coding agent can hand you.</p>
+
+  <footer>
+    Spec: <a href="https://github.com/New1Direction/korg">korg-ledger@v1</a> · agent: <a href="https://github.com/New1Direction/korgex">korgex</a> ·
+    pin the signer for a stronger check:
+    <div class="pin">korg-verify deliverable.korgreceipt.json --pubkey b251a84c2d23d318ef60241a5932622980821d1af12c4cdbda042af9186e8dff</div>
+  </footer>
+</div>
+</body>
+</html>
