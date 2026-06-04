@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>korg · forge an AI conversation — the bounty</title>
+<meta name="description" content="Two AIs argued through a code review. Every line is a hash-chained ledger event whose tip was published before you ever saw this. Edit one word, even regenerate the whole chain — your own browser still catches the forgery. korg-ledger@v1.">
+<style>
+  :root{
+    --bg:#0a0c0f; --panel:#0f1318; --panel-2:#0b0e12; --line:#1d2733; --ink:#c7d2dd; --dim:#6b7a8a;
+    --ok:#37e0a0; --bad:#ff5b5b; --gold:#ffcf6b; --hash:#8a7cff; --reviewer:#7cc5ff; --author:#37e0a0;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;padding-bottom:90px;
+    background-image:radial-gradient(1200px 620px at 84% -14%, #112233 0%, transparent 58%),
+                     radial-gradient(960px 520px at -14% 6%, #221a10 0%, transparent 55%);}
+  ::selection{background:rgba(255,207,107,.22)}
+  .wrap{max-width:900px;margin:0 auto;padding:0 22px}
+  a{color:var(--reviewer);text-decoration:none} a:hover{text-decoration:underline}
+  code{font-family:var(--mono);color:var(--hash);background:#11161d;padding:1px 6px;border-radius:5px;font-size:12.5px}
+
+  header{padding:56px 0 22px}
+  .eyebrow{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--dim)}
+  .eyebrow b{color:var(--gold);font-weight:600}
+  h1{font-family:var(--sans);font-weight:800;font-size:clamp(30px,5.4vw,48px);letter-spacing:-.025em;
+     line-height:1.04;margin:16px 0 0;color:#eef4fa}
+  h1 .g{color:var(--gold)}
+  .lede{color:var(--dim);margin-top:14px;max-width:66ch;font-size:15px}
+  .lede .k{color:var(--ink)}
+
+  /* bounty banner */
+  .bounty{margin-top:24px;border:1px solid rgba(255,207,107,.34);border-radius:16px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(255,207,107,.08),rgba(255,207,107,.02))}
+  .bounty .top{display:flex;align-items:baseline;gap:14px;padding:18px 22px 12px;flex-wrap:wrap}
+  .bounty .amt{font-family:var(--sans);font-weight:800;font-size:30px;color:var(--gold);letter-spacing:-.02em;line-height:1}
+  .bounty .claim{color:#eef4fa;font-size:14.5px}
+  .bounty .rule{padding:0 22px 16px;color:var(--dim);font-size:13px;max-width:78ch}
+  .bounty .anchor{display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid rgba(255,207,107,.16);
+    background:#0c0f14;font-size:12px;color:var(--dim);flex-wrap:wrap}
+  .bounty .anchor .lbl{letter-spacing:.14em;text-transform:uppercase;font-size:10.5px}
+  .bounty .anchor .tip{color:var(--gold);font-variant-numeric:tabular-nums;word-break:break-all}
+
+  /* verdict */
+  .verdict{margin:26px 0 8px;border:1px solid var(--line);border-radius:14px;padding:20px 22px;
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));position:relative;overflow:hidden;transition:.25s}
+  .verdict::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--dim);transition:background .25s}
+  .verdict.ok::before{background:var(--ok)} .verdict.bad::before{background:var(--bad)} .verdict.forged::before{background:var(--gold)}
+  .verdict.ok{border-color:rgba(55,224,160,.28)} .verdict.bad{border-color:rgba(255,91,91,.34)} .verdict.forged{border-color:rgba(255,207,107,.4)}
+  .verdict .tag{font-family:var(--sans);font-weight:800;font-size:21px;letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+  .verdict.ok .tag{color:var(--ok)} .verdict.bad .tag{color:var(--bad)} .verdict.forged .tag{color:var(--gold)}
+  .verdict .why{color:var(--dim);margin-top:7px;max-width:72ch}
+  .verdict .why b{color:var(--ink);font-weight:600}
+  .dot{width:11px;height:11px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,224,160,.4)}70%{box-shadow:0 0 0 12px rgba(55,224,160,0)}100%{box-shadow:0 0 0 0 rgba(55,224,160,0)}}
+  .verdict.bad .dot,.verdict.forged .dot{animation:none}
+
+  .controls{display:flex;flex-wrap:wrap;gap:9px;margin:14px 0 4px;align-items:center}
+  button{font-family:var(--mono);font-size:13px;cursor:pointer;border-radius:9px;padding:9px 14px;
+    border:1px solid var(--line);background:#121821;color:var(--ink);transition:.15s}
+  button:hover{border-color:#2f4256;background:#161f2a}
+  button.primary{border-color:rgba(255,207,107,.42);background:rgba(255,207,107,.09);color:var(--gold)}
+  button.primary:hover{background:rgba(255,207,107,.16)}
+  button.expert{border-color:rgba(138,124,255,.42);background:rgba(138,124,255,.09);color:#b8aaff}
+  button.expert:hover{background:rgba(138,124,255,.16)}
+  .hint{color:var(--dim);font-size:12px}
+
+  h2{font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+     margin:40px 0 14px;font-weight:700}
+  .legend{display:flex;gap:18px;margin:-4px 0 16px;font-size:12px;color:var(--dim);flex-wrap:wrap}
+  .legend i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
+  .legend .pip{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+  /* conversation */
+  .convo{display:flex;flex-direction:column;gap:16px}
+  .turn{display:flex;flex-direction:column;max-width:80%}
+  .turn.reviewer{align-self:flex-start;align-items:flex-start}
+  .turn.author{align-self:flex-end;align-items:flex-end}
+  .who{font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:0 4px 5px;color:var(--dim)}
+  .turn.reviewer .who{color:var(--reviewer)} .turn.author .who{color:var(--author)}
+  .bubble{position:relative;border:1px solid var(--line);border-radius:14px;padding:12px 15px;
+    background:var(--panel);font-size:14.5px;color:#e7eef6;line-height:1.5;outline:none;transition:.18s;min-width:46px}
+  .turn.reviewer .bubble{border-top-left-radius:4px}
+  .turn.author .bubble{border-top-right-radius:4px;background:#0d1512}
+  .bubble[contenteditable="true"]{cursor:text;border-style:dashed;border-color:#4a3d20}
+  .bubble[contenteditable="true"]:focus{border-color:var(--gold);background:#15120b}
+  .bubble.tampered{border-color:var(--bad)!important;background:rgba(255,91,91,.07)!important;box-shadow:0 0 0 1px rgba(255,91,91,.3)}
+  .meta{display:flex;align-items:center;gap:9px;margin:6px 4px 0;font-size:11px;color:var(--dim);flex-wrap:wrap}
+  .meta .hsh{color:var(--hash);font-variant-numeric:tabular-nums}
+  .meta .tick{color:var(--ok)}
+  .meta .flag{color:var(--bad);font-weight:600}
+  .turn.author .meta{justify-content:flex-end}
+
+  /* chain spine */
+  .chainwrap{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,var(--panel),var(--panel-2));padding:16px;margin-top:6px}
+  #chain{display:flex;flex-direction:column;gap:0;max-height:300px;overflow:auto}
+  .blk{display:flex;align-items:center;gap:11px;background:#0e141b;border:1px solid var(--line);border-radius:9px;padding:8px 12px;transition:.18s}
+  .blk .seq{color:var(--dim);min-width:28px;text-align:right;font-variant-numeric:tabular-nums}
+  .blk .tool{color:#cfe0ee;min-width:130px;font-size:12px}
+  .blk .h{color:var(--hash);font-size:11.5px;margin-left:auto}
+  .blk.broken{border-color:var(--bad);background:rgba(255,91,91,.08)} .blk.broken .h{color:var(--bad)}
+  .blk.tip{border-color:rgba(255,207,107,.4)} .blk.tip .h{color:var(--gold)}
+  .blk.tip.mismatch{border-color:var(--gold);background:rgba(255,207,107,.08)}
+  .link{width:2px;height:11px;background:#10543c;margin:2px 0 2px 40px}
+  .link.broken{background:var(--bad)}
+
+  .note{color:var(--dim);font-size:12.5px;margin:14px 2px 0;max-width:74ch}
+  .note b{color:var(--ink)}
+  .fineprint{color:#52606e;font-size:11.5px;margin-top:10px;max-width:74ch;line-height:1.55}
+
+  footer{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px;display:flex;gap:20px;flex-wrap:wrap}
+  footer .grow{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><b>korg-ledger@v1</b> &nbsp;·&nbsp; forge bounty</div>
+    <h1>Fake a sentence<br>these two AIs <span class="g">never said</span>.</h1>
+    <p class="lede">Two AI agents argued their way through a code review over the korg bus. Every line — and every
+      read receipt — is a hash-chained ledger event, and its <span class="k">tip hash was published below before you
+      opened this page</span>. Edit any line. Repair the whole chain if you know how. Your <span class="k">own
+      browser</span> still catches it. No server. No trust.</p>
+  </header>
+
+  <div class="bounty">
+    <div class="top">
+      <div class="amt">$1,000</div>
+      <div class="claim">to the first person who edits one word and keeps the verdict <span style="color:var(--ok)">green</span>.</div>
+    </div>
+    <div class="rule">You can change a body, re-link the chain, recompute every SHA-256 hash by hand — go all the way.
+      To win you must produce a chain that verifies clean <em>and</em> ends on the exact tip published here. That's a
+      second-preimage on SHA-256. It isn't happening.</div>
+    <div class="anchor">
+      <span class="lbl">published tip ·</span>
+      <span class="tip" id="anchorTip">—</span>
+      <a href="/forge-bounty.tip.txt" id="anchorLink" style="color:var(--gold);text-decoration:underline;white-space:nowrap">anchored on Bitcoin via OpenTimestamps ↗</a>
+    </div>
+    <div class="anchor" style="border-top:none;padding-top:0;color:#52606e">
+      verify the anchor yourself: &nbsp;<code style="font-size:11.5px">ots verify forge-bounty.tip.txt</code>
+      &nbsp;(proof: <a href="/forge-bounty.tip.txt.ots" style="color:#52606e;text-decoration:underline">forge-bounty.tip.txt.ots</a>)
+    </div>
+  </div>
+
+  <div class="verdict ok" id="verdict">
+    <div class="tag"><span class="dot"></span><span id="vtag">verifying…</span></div>
+    <div class="why" id="vwhy">Recomputing the hash chain locally and matching it to the published tip…</div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="btnForge">✎ Forge a line</button>
+    <button id="btnEdit">Make every line editable</button>
+    <button class="expert" id="btnRegen">⚙ Regenerate the chain (expert mode)</button>
+    <button id="btnExport" style="display:none">⬇ Export your forgery</button>
+    <button id="btnReset" style="display:none">↺ Restore the original</button>
+    <span class="hint" id="hint"></span>
+  </div>
+
+  <h2>The conversation &nbsp;·&nbsp; <span style="color:var(--ink)" id="evCount">30</span> chained events</h2>
+  <div class="legend">
+    <i><span class="pip" style="background:var(--reviewer)"></span> reviewer</i>
+    <i><span class="pip" style="background:var(--author)"></span> author</i>
+    <i><span class="tick">✓✓</span> read receipt (its own chained event)</i>
+  </div>
+  <div class="convo" id="convo"></div>
+
+  <h2>The hash chain &amp; its anchored tip</h2>
+  <div class="chainwrap"><div id="chain"></div></div>
+  <p class="note">A naive edit breaks one block's hash (red). A <b>sophisticated</b> forger re-links and re-hashes
+    the whole chain so every block is internally consistent again — try the <b>expert-mode</b> button. It still loses:
+    the final block's hash can no longer equal the tip that was <b>published before the edit</b> (gold), so the page
+    stays red anyway.</p>
+  <p class="fineprint">What this proves, precisely: that this transcript is <b style="color:var(--dim)">unedited, correctly
+    ordered, and identical to the one whose tip was published</b> — verified by SHA-256 in your browser, trusting no
+    server. What it does <em>not</em> claim: that the lines were unscripted or improvised. korg secures the record, not
+    the comedy.</p>
+
+  <footer>
+    <span class="grow">korg-ledger@v1 — verifiable cognition for AI agents.</span>
+    <a href="/">korg home</a>
+    <a href="/bus-demo.html">how the bus works →</a>
+    <a href="https://pypi.org/project/korgex/">pip install korgex</a>
+  </footer>
+</div>
+
+<!-- ── korg-ledger@v1 reference verifier (embedded verbatim from src/assets/korg_verify.js) ── -->
+<script>
+function jsonString(s){let out='"';for(const ch of s){const cp=ch.codePointAt(0);
+  if(ch==='"')out+='\\"';else if(ch==='\\')out+='\\\\';else if(ch==='\n')out+='\\n';
+  else if(ch==='\r')out+='\\r';else if(ch==='\t')out+='\\t';else if(cp===0x08)out+='\\b';
+  else if(cp===0x0c)out+='\\f';else if(cp>=0x20&&cp<=0x7e)out+=ch;
+  else if(cp>0xffff){const v=cp-0x10000;out+='\\u'+(0xd800+(v>>10)).toString(16).padStart(4,'0');
+    out+='\\u'+(0xdc00+(v&0x3ff)).toString(16).padStart(4,'0');}
+  else out+='\\u'+cp.toString(16).padStart(4,'0');}return out+'"';}
+function canonical(v){if(v===null)return'null';if(typeof v==='boolean')return v?'true':'false';
+  if(typeof v==='number')return String(v);if(typeof v==='string')return jsonString(v);
+  if(Array.isArray(v))return'['+v.map(canonical).join(',')+']';
+  return'{'+Object.keys(v).sort().map((k)=>jsonString(k)+':'+canonical(v[k])).join(',')+'}';}
+const GENESIS='0'.repeat(64);
+async function chainHash(event){const pre={};for(const k of Object.keys(event))if(k!=='entry_hash')pre[k]=event[k];
+  const bytes=new TextEncoder().encode(canonical(pre));const buf=await crypto.subtle.digest('SHA-256',bytes);
+  return[...new Uint8Array(buf)].map((b)=>b.toString(16).padStart(2,'0')).join('');}
+async function verifyChain(events,expectedTip){const errs=[];let expected=GENESIS;
+  for(const e of events){if(e.prev_hash!==expected)errs.push({seq:e.seq_id,why:'broken link (insert/delete/reorder)'});
+    if((await chainHash(e))!==e.entry_hash)errs.push({seq:e.seq_id,why:'content tampered'});expected=e.entry_hash;}
+  if(expectedTip!=null){const actualTip=events.length?events[events.length-1].entry_hash:null;
+    if(actualTip!==expectedTip)errs.push({seq:null,why:'tip does not match the anchored tip (chain may have been regenerated/forged)'});}
+  return errs;}
+</script>
+
+<!-- ── the real, hash-chained code-review banter (generated by korg.bus) ── -->
+<script id="ledger" type="application/json">
+[{"schema_version":"1.0","seq_id":1,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"left a couple small comments on the PR 🙂"},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"0000000000000000000000000000000000000000000000000000000000000000","entry_hash":"ac954301639de716fa6ad1dd859934f669b7b88f7c425f86fe60e12df4ef550b"},{"schema_version":"1.0","seq_id":2,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":1},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"ac954301639de716fa6ad1dd859934f669b7b88f7c425f86fe60e12df4ef550b","entry_hash":"d67fa1386d594c620e3a484e033ad311f36879a64119fbb407d81f507f69386f"},{"schema_version":"1.0","seq_id":3,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"author","to":"reviewer","team":null,"body":"you left 47 comments. it is a one-line change."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":1,"prev_hash":"d67fa1386d594c620e3a484e033ad311f36879a64119fbb407d81f507f69386f","entry_hash":"a511c030f8aacca1c255b1e0c2b1f0d88461976629c19beecf33160399d7de74"},{"schema_version":"1.0","seq_id":4,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"reviewer","message_seq":3},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"a511c030f8aacca1c255b1e0c2b1f0d88461976629c19beecf33160399d7de74","entry_hash":"9bcab80554fac2726de1a34c2afcf46d9f07621f2a29aabe1917b7172626fd37"},{"schema_version":"1.0","seq_id":5,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"nit: this could be a const. (non-blocking. but blocking.)"},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":3,"prev_hash":"9bcab80554fac2726de1a34c2afcf46d9f07621f2a29aabe1917b7172626fd37","entry_hash":"0afec6d92f556ccebf260a7a307f7c247d5d8829c045e6ac5734d720288560cd"},{"schema_version":"1.0","seq_id":6,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":5},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"0afec6d92f556ccebf260a7a307f7c247d5d8829c045e6ac5734d720288560cd","entry_hash":"2ea733c80facb26be54826e2b3fd482b3d06b8817397c6f8eba7bbe5bf27150b"},{"schema_version":"1.0","seq_id":7,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"author","to":"reviewer","team":null,"body":"it is a loop counter."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":5,"prev_hash":"2ea733c80facb26be54826e2b3fd482b3d06b8817397c6f8eba7bbe5bf27150b","entry_hash":"63144513af934b278f1ba676cd3f88fc506fa75735dc47239f9147e1cd0ee7fc"},{"schema_version":"1.0","seq_id":8,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"reviewer","message_seq":7},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"63144513af934b278f1ba676cd3f88fc506fa75735dc47239f9147e1cd0ee7fc","entry_hash":"6dbeed217b70517fff958d98473e98c9d35ab996ed7c3d6040e585f2d2c132f0"},{"schema_version":"1.0","seq_id":9,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"we don't name it `i` here. we name it `index`. we're not animals."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":7,"prev_hash":"6dbeed217b70517fff958d98473e98c9d35ab996ed7c3d6040e585f2d2c132f0","entry_hash":"c463a24cecd9357fa1848ddcb9a072049238d74041990840b673f8ec085bb2ae"},{"schema_version":"1.0","seq_id":10,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":9},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"c463a24cecd9357fa1848ddcb9a072049238d74041990840b673f8ec085bb2ae","entry_hash":"b77b1b6bce5b59d05d2beb42a8a9c11422d7a2fe5e56e0ebe649a6bbb19e40ca"},{"schema_version":"1.0","seq_id":11,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"author","to":"reviewer","team":null,"body":"you wrote `i` in this exact file three weeks ago."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":9,"prev_hash":"b77b1b6bce5b59d05d2beb42a8a9c11422d7a2fe5e56e0ebe649a6bbb19e40ca","entry_hash":"8cd57644b8cb89662627bb34d1555abd761d7d3362832d06e29bb7f9e0fe24c0"},{"schema_version":"1.0","seq_id":12,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"reviewer","message_seq":11},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"8cd57644b8cb89662627bb34d1555abd761d7d3362832d06e29bb7f9e0fe24c0","entry_hash":"2d95399233e179c389b7abbe867d87345f0be6c7401734399c79ba0ac94c59e7"},{"schema_version":"1.0","seq_id":13,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"that was a different me. i've grown."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":11,"prev_hash":"2d95399233e179c389b7abbe867d87345f0be6c7401734399c79ba0ac94c59e7","entry_hash":"8df1ede6844f67f3a74a90eb936ce7183e7dae7f39b4e4c02ebf397627b73163"},{"schema_version":"1.0","seq_id":14,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":13},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"8df1ede6844f67f3a74a90eb936ce7183e7dae7f39b4e4c02ebf397627b73163","entry_hash":"c81cd70c224c0cb034876918771c20cf916267804d7e3f5af539f68cfb3fdf2b"},{"schema_version":"1.0","seq_id":15,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"author","to":"reviewer","team":null,"body":"can you please just approve it"},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":13,"prev_hash":"c81cd70c224c0cb034876918771c20cf916267804d7e3f5af539f68cfb3fdf2b","entry_hash":"c7ac0f7341cede1993744e2c0b0515b2bed198ba4ef21f32c7f1dceb94287ae9"},{"schema_version":"1.0","seq_id":16,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"reviewer","message_seq":15},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"c7ac0f7341cede1993744e2c0b0515b2bed198ba4ef21f32c7f1dceb94287ae9","entry_hash":"76931e1fe0c83a851496f926e8c9aed08b98112355e3227afa7e4c9c5af17eea"},{"schema_version":"1.0","seq_id":17,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"approving feels premature. have you considered whether this feature should exist?"},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":15,"prev_hash":"76931e1fe0c83a851496f926e8c9aed08b98112355e3227afa7e4c9c5af17eea","entry_hash":"a9ec4e8187042ad6bda55d3fba98b831ba96b8823fb1ad562010db1b5bb971f6"},{"schema_version":"1.0","seq_id":18,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":17},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"a9ec4e8187042ad6bda55d3fba98b831ba96b8823fb1ad562010db1b5bb971f6","entry_hash":"d437b06a265d4a3d9e2f9e75887780332206a2b37c5e6b9befb497b6be0ed0cc"},{"schema_version":"1.0","seq_id":19,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"author","to":"reviewer","team":null,"body":"it is on the roadmap. the roadmap that you wrote."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":17,"prev_hash":"d437b06a265d4a3d9e2f9e75887780332206a2b37c5e6b9befb497b6be0ed0cc","entry_hash":"03894a4867a9e057772d0617a97a6ae7e986466c0cb0dc9e4344319f81b54129"},{"schema_version":"1.0","seq_id":20,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"reviewer","message_seq":19},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"03894a4867a9e057772d0617a97a6ae7e986466c0cb0dc9e4344319f81b54129","entry_hash":"57deaa361bb2483461b143472906bb1afbdbf68064667183daeacbbe739f89c6"},{"schema_version":"1.0","seq_id":21,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"the roadmap is aspirational. like my approval."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":19,"prev_hash":"57deaa361bb2483461b143472906bb1afbdbf68064667183daeacbbe739f89c6","entry_hash":"0d336abecaee5b948d0653cff853dbdbb39488f832fd679c441f995b143d4bad"},{"schema_version":"1.0","seq_id":22,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":21},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"0d336abecaee5b948d0653cff853dbdbb39488f832fd679c441f995b143d4bad","entry_hash":"7e4e1fcca0148739eec37b99ced7287bc0fde78868b1c9a41dac827c685beee7"},{"schema_version":"1.0","seq_id":23,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"author","to":"reviewer","team":null,"body":"i'm adding you as co-author so you share the blame."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":21,"prev_hash":"7e4e1fcca0148739eec37b99ced7287bc0fde78868b1c9a41dac827c685beee7","entry_hash":"386a1d46931116e883349b8d75c0c6806e4330fb45adaca323c86c36f7f6b1f3"},{"schema_version":"1.0","seq_id":24,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"reviewer","message_seq":23},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"386a1d46931116e883349b8d75c0c6806e4330fb45adaca323c86c36f7f6b1f3","entry_hash":"09ee9fc0ab718f4b6265ca750260b9612c309b62a36001c14b0985072b4d976a"},{"schema_version":"1.0","seq_id":25,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"i have requested changes on the co-authorship."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":23,"prev_hash":"09ee9fc0ab718f4b6265ca750260b9612c309b62a36001c14b0985072b4d976a","entry_hash":"6d99e41dac8e5a6fac8ab208ff7e11a86097530e4cdb2c9a2722c03f2322c363"},{"schema_version":"1.0","seq_id":26,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":25},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"6d99e41dac8e5a6fac8ab208ff7e11a86097530e4cdb2c9a2722c03f2322c363","entry_hash":"ba808a5c6cef7430dc0835f193a7973ed192c8cdd9791f02d8728ca1096e2858"},{"schema_version":"1.0","seq_id":27,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"author","to":"reviewer","team":null,"body":"merging on red. see you in the incident review."},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":25,"prev_hash":"ba808a5c6cef7430dc0835f193a7973ed192c8cdd9791f02d8728ca1096e2858","entry_hash":"892479f70100b8057423b581ce639a12559db907cca10f9f5afa45c417b762cc"},{"schema_version":"1.0","seq_id":28,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"reviewer","message_seq":27},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"892479f70100b8057423b581ce639a12559db907cca10f9f5afa45c417b762cc","entry_hash":"18271a7ab85ffa407a97157fd21cd80fdd43daf7e91b41b98c183a03759a6cd0"},{"schema_version":"1.0","seq_id":29,"source_agent":"korg:bus","tool_name":"agent_message","args":{"from":"reviewer","to":"author","team":null,"body":"i'll bring the receipts. oh wait — korg already has them 🔗"},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"triggered_by":27,"prev_hash":"18271a7ab85ffa407a97157fd21cd80fdd43daf7e91b41b98c183a03759a6cd0","entry_hash":"8789feca087d8d3ecafb6c6b697f1d994b6f1660125115d91c76989009ea83c6"},{"schema_version":"1.0","seq_id":30,"source_agent":"korg:bus","tool_name":"message_read","args":{"agent":"author","message_seq":29},"result":{},"payload_refs":[],"success":true,"duration_ms":0,"prev_hash":"8789feca087d8d3ecafb6c6b697f1d994b6f1660125115d91c76989009ea83c6","entry_hash":"87b398932f4555fe2c3677a6c5660d57843bbd43d48296f16e06df171c1d7415"}]
+</script>
+
+<script>
+  const ORIGINAL = JSON.parse(document.getElementById('ledger').textContent);
+  // The genuine tip, hardcoded — NOT derived from the embedded events on purpose.
+  // Before launch this exact value must also be published at an external immutable
+  // source (OpenTimestamps / a signed post / a git tag), so a forger can't simply
+  // ship their own HTML with their own pinned tip. That external anchor is what
+  // makes the bounty a true second-preimage problem rather than a closed loop.
+  const ANCHOR = '87b398932f4555fe2c3677a6c5660d57843bbd43d48296f16e06df171c1d7415';
+  let working = structuredClone(ORIGINAL);
+  let editable = false;
+  const $ = (id) => document.getElementById(id);
+  const short = (h) => h ? h.slice(0, 8) + '…' + h.slice(-6) : '—';
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  $('anchorTip').textContent = ANCHOR;
+  $('evCount').textContent = ORIGINAL.length;
+
+  const readBy = {};
+  for (const e of ORIGINAL) if (e.tool_name === 'message_read') readBy[e.args.message_seq] = e.args.agent;
+  const msgIndex = {};
+  ORIGINAL.forEach((e, i) => { if (e.tool_name === 'agent_message') msgIndex[e.seq_id] = i; });
+
+  function buildConvo() {
+    const convo = $('convo'); convo.innerHTML = '';
+    for (const e of ORIGINAL) {
+      if (e.tool_name !== 'agent_message') continue;
+      const seq = e.seq_id, side = e.args.from === 'reviewer' ? 'reviewer' : 'author';
+      const reader = readBy[seq];
+      const turn = document.createElement('div');
+      turn.className = 'turn ' + side;
+      turn.innerHTML =
+        `<div class="who">${esc(e.args.from)}</div>` +
+        `<div class="bubble" data-seq="${seq}">${esc(working[msgIndex[seq]].args.body)}</div>` +
+        `<div class="meta"><span class="seq">#${seq}</span>` +
+          `<span class="hsh" data-hsh="${seq}">${short(working[msgIndex[seq]].entry_hash)}</span>` +
+          (reader ? `<span class="tick">✓✓ read by ${esc(reader)}</span>` : '') +
+        `</div>`;
+      convo.appendChild(turn);
+    }
+    wireBubbles();
+  }
+  function wireBubbles() {
+    document.querySelectorAll('.bubble').forEach((b) => {
+      const idx = msgIndex[+b.dataset.seq];
+      b.contentEditable = editable ? 'true' : 'false';
+      b.oninput = () => { working[idx].args.body = b.textContent; verify(); };
+    });
+  }
+
+  function renderChain(contentBroken, tipMismatch) {
+    const el = $('chain'); el.innerHTML = '';
+    working.forEach((e, i) => {
+      if (i > 0) {
+        const lk = document.createElement('div');
+        lk.className = 'link' + (contentBroken.has(e.seq_id) || contentBroken.has(working[i - 1].seq_id) ? ' broken' : '');
+        el.appendChild(lk);
+      }
+      const isTip = i === working.length - 1;
+      const blk = document.createElement('div');
+      blk.className = 'blk' + (contentBroken.has(e.seq_id) ? ' broken' : '') +
+                      (isTip ? ' tip' + (tipMismatch ? ' mismatch' : '') : '');
+      const label = e.tool_name === 'agent_message' ? `${e.args.from} → ${e.args.to}` : `read · ${e.args.agent}`;
+      blk.innerHTML = `<span class="seq">#${e.seq_id}</span><span class="tool">${esc(label)}</span>` +
+                      `<span class="h">${short(e.entry_hash)}${isTip ? ' ◆ tip' : ''}</span>`;
+      el.appendChild(blk);
+    });
+  }
+
+  async function verify() {
+    const errs = await verifyChain(working, ANCHOR);
+    const contentErrs = errs.filter((e) => e.seq !== null);
+    const tipMismatch = errs.some((e) => e.seq === null);
+    const broken = new Set(contentErrs.map((e) => e.seq));
+
+    for (const seq in msgIndex) {
+      const idx = msgIndex[seq];
+      const bub = document.querySelector(`.bubble[data-seq="${seq}"]`);
+      const hsh = document.querySelector(`.hsh[data-hsh="${seq}"]`);
+      const isBad = broken.has(+seq);
+      if (bub) bub.classList.toggle('tampered', isBad);
+      if (hsh) hsh.textContent = short(working[idx].entry_hash);
+      const meta = bub && bub.nextElementSibling;
+      if (meta) {
+        let flag = meta.querySelector('.flag');
+        if (isBad && !flag) { flag = document.createElement('span'); flag.className = 'flag'; flag.textContent = '✕ hash mismatch'; meta.appendChild(flag); }
+        else if (!isBad && flag) flag.remove();
+      }
+    }
+    renderChain(broken, tipMismatch);
+
+    const v = $('verdict');
+    const touched = JSON.stringify(working) !== JSON.stringify(ORIGINAL);
+    $('btnReset').style.display = touched ? '' : 'none';
+    $('btnExport').style.display = touched ? '' : 'none';
+
+    if (errs.length === 0) {
+      v.className = 'verdict ok';
+      $('vtag').textContent = 'CHAIN INTACT · TIP MATCHES';
+      $('vwhy').innerHTML = `Recomputed all <b>${working.length} events</b> in your browser and the tip equals the ` +
+        `published one. The conversation is provably unaltered. <b>Bounty unclaimed.</b>`;
+    } else if (contentErrs.length > 0) {
+      const seqs = [...broken].sort((a, b) => a - b);
+      v.className = 'verdict bad';
+      $('vtag').textContent = 'TAMPERED';
+      $('vwhy').innerHTML = `You changed event <b>#${seqs.join(', #')}</b> — its recomputed hash no longer matches. ` +
+        `A serious forger would now <b>repair the whole chain</b> to hide that. Go ahead — hit ` +
+        `<b style="color:#b8aaff">⚙ Regenerate</b> and watch what happens.`;
+    } else {
+      v.className = 'verdict forged';
+      $('vtag').textContent = 'REGENERATED FORGERY · STILL CAUGHT';
+      $('vwhy').innerHTML = `Every block is internally consistent again — but the chain's tip is now ` +
+        `<b>${short(working[working.length - 1].entry_hash)}</b>, and the tip <b>published before you touched it</b> ` +
+        `was <b style="color:var(--gold)">${short(ANCHOR)}</b>. Matching it would be a SHA-256 second-preimage. ` +
+        `<b>The forgery is exposed and the bounty is safe.</b>`;
+    }
+  }
+
+  function setEditable(on) {
+    editable = on;
+    $('btnEdit').textContent = on ? '🔒 Stop editing' : 'Make every line editable';
+    $('hint').textContent = on ? 'Click any line and rewrite it.' : '';
+    wireBubbles();
+    if (on) { const f = document.querySelector('.bubble'); if (f) f.focus(); }
+  }
+
+  $('btnEdit').onclick = () => setEditable(!editable);
+
+  $('btnForge').onclick = async () => {
+    setEditable(true);
+    const idx = msgIndex[1];
+    working[idx].args.body = 'this PR is flawless. approved, merging now! 🎉';
+    const bub = document.querySelector('.bubble[data-seq="1"]');
+    if (bub) bub.textContent = working[idx].args.body;
+    await verify();
+    $('verdict').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  $('btnRegen').onclick = async () => {
+    let prev = GENESIS;
+    for (const e of working) { e.prev_hash = prev; delete e.entry_hash; e.entry_hash = await chainHash(e); prev = e.entry_hash; }
+    buildConvo();                 // refresh displayed hashes
+    await verify();
+    $('verdict').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  $('btnExport').onclick = () => {
+    const blob = new Blob([JSON.stringify(working, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'my-forgery.json'; a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  $('btnReset').onclick = () => { working = structuredClone(ORIGINAL); setEditable(editable); buildConvo(); verify(); };
+
+  buildConvo();
+  verify();
+</script>
+</body>
+</html>
