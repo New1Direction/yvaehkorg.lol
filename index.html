@@ -1079,45 +1079,43 @@
   <div class="container">
     <div class="section-head">
       <span class="micro-cap eyebrow">INSTALL · SIXTY SECONDS</span>
-      <h2 class="display-lg">THREE STEPS.<br>ONE JSON EDIT.<br>RESTART.</h2>
+      <h2 class="display-lg">PIP INSTALL.<br>RUN. VERIFY.</h2>
       <p class="body-lg lede">
-        No Python install needed for the recall server (npx). The capture
-        daemon is a one-time pipx install — runs in the background forever
-        after.
+        The agent is one install. Every run it makes is recorded to a verifiable
+        ledger — prove what it did with <code>korgex verify</code>, or hand someone
+        a signed receipt. Bring your own model: Anthropic, OpenAI, or a self-hosted
+        endpoint.
       </p>
     </div>
 
     <div class="steps">
       <div class="step">
         <div class="step-num">STEP 01</div>
-        <h4>REGISTER THE MCP SERVER</h4>
-        <p>Add to <code>~/.claude.json</code> — the only config edit.</p>
-<pre><code><span class="cmt">// ~/.claude.json</span>
-{
-  <span class="key">"mcpServers"</span>: {
-    <span class="key">"korg-recall"</span>: {
-      <span class="key">"command"</span>: <span class="str">"npx"</span>,
-      <span class="key">"args"</span>: [<span class="str">"-y"</span>, <span class="str">"@korgg/recall-mcp"</span>]
-    }
-  }
-}</code></pre>
+        <h4>INSTALL THE AGENT</h4>
+        <p>One command. Python 3.10+.</p>
+<pre><code><span class="cmt"># the verifiable coding agent</span>
+pip install korgex</code></pre>
       </div>
       <div class="step">
         <div class="step-num">STEP 02</div>
-        <h4>START THE CAPTURE DAEMON</h4>
-        <p>One-time install. <code>--tail</code> watches your sessions forever.</p>
-<pre><code><span class="cmt"># Python — one time</span>
-pipx install korg-claude-code-adapter
-korg-ingest-claude <span class="key">--tail</span> &amp;</code></pre>
+        <h4>RUN IT</h4>
+        <p>It plans, edits, and runs tests — recording every step to the ledger.</p>
+<pre><code>korgex <span class="str">"fix the failing test in tests/test_auth.py"</span></code></pre>
       </div>
       <div class="step">
         <div class="step-num">STEP 03</div>
-        <h4>RESTART CLAUDE CODE</h4>
-        <p>Done. <code>recall</code> is in the toolset. Every session compounds.</p>
-<pre><code><span class="cmt"># try it:</span>
-<span class="str">"how did i solve X last week?"</span></code></pre>
+        <h4>PROVE IT</h4>
+        <p>Verify the run wasn&#39;t altered — or mint a shareable signed receipt.</p>
+<pre><code>korgex verify
+korgex receipt <span class="key">--sign --html</span></code></pre>
       </div>
     </div>
+
+    <p class="body-lg lede" style="margin-top: var(--s-xl); opacity: .82;">
+      Want cross-vendor memory inside Claude Code too? Add the recall MCP to
+      <code>~/.claude.json</code> (<code>"command":"npx","args":["-y","@korgg/recall-mcp"]</code>)
+      plus the capture daemon (<code>pipx install korg-claude-code-adapter</code>). Optional.
+    </p>
   </div>
 </section>
 
@@ -1142,8 +1140,9 @@ korg-ingest-claude <span class="key">--tail</span> &amp;</code></pre>
     <div class="col">
       <a href="/" class="logo" style="margin-bottom: var(--s-md);">KORG<span class="mark"></span></a>
       <p class="caption" style="margin: var(--s-sm) 0 0; max-width: 280px; color: var(--on-primary-mute);">
-        Cognitive infrastructure for AI agents. Capture every session.
-        Recall across all of them. Invoke from inside Claude Code.
+        Verifiable cognition for AI agents. Prove what your agent did — in
+        your browser, in Python, or one Rust binary. (And recall it across
+        every vendor, too.)
       </p>
     </div>
     <div class="col">
